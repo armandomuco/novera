@@ -1,0 +1,7 @@
+<svg width="180" height="44" viewBox="0 0 180 44" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Novera logo">
+  <rect x="2" y="2" width="40" height="40" rx="8" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <path d="M22 8L34 15V29L22 36L10 29V15L22 8Z" stroke="#0F766E" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M22 8V22M10 15L22 22L34 15M10 29L22 22L34 29M22 36V22" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="22" cy="22" r="3.5" fill="#0F766E"/>
+  <text x="54" y="29" fill="#111827" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="0">Novera</text>
+</svg>

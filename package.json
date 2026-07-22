@@ -1,0 +1,31 @@
+{
+  "name": "novera",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI Digital Twin for Businesses MVP monorepo.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:start": "./scripts/dev-start.sh",
+    "dev:stop": "./scripts/dev-stop.sh",
+    "dev:down": "./scripts/dev-down.sh",
+    "dev:status": "./scripts/dev-status.sh",
+    "check:node": "./scripts/check-node-version.sh",
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  }
+}
