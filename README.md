@@ -102,6 +102,9 @@ Useful endpoints:
 - `GET /api/v1/health`
 - `GET /api/v1/auth/status`
 - `GET /api/v1/organizations/status`
+- `GET /api/v1/demo/workspace`
+- `POST /api/v1/demo/login`
+- `PATCH /api/v1/demo/profile`
 
 ## Frontend
 

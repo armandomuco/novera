@@ -6,8 +6,8 @@
 | --- | --- | --- | --- | --- |
 | Product validation | Planned | P0 | Medium | 0 |
 | Monorepo foundation | Done | P0 | Medium | 1 |
-| Authentication and sessions | Planned | P0 | High | 2 |
-| Organizations and permissions | Planned | P0 | High | 2 |
+| Authentication and sessions | In progress | P0 | High | 2 |
+| Organizations and permissions | In progress | P0 | High | 2 |
 | Projects and knowledge items | Planned | P0 | High | 3 |
 | Documents and processing | Planned | P0 | High | 4 |
 | Hybrid search and AI assistant | Planned | P0 | Very high | 5 |
@@ -20,8 +20,8 @@
 | Story | Acceptance Criteria | Dependencies | Priority | Complexity | Milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | As a visitor, I want to understand the product quickly, so that I can decide whether to try it. | Landing page explains value and opens demo shell. | Foundation | P0 | Low | 1 | Done |
-| As a user, I want to register and verify my email, so that my account is trusted. | Email, password, verification token, secure hash, validation. | Foundation | P0 | Medium | 2 | Planned |
-| As a user, I want to create an organization, so that my company data has a tenant boundary. | Organization record, owner membership, settings. | Auth | P0 | Medium | 2 | Planned |
+| As a user, I want to register and verify my email, so that my account is trusted. | Email, password, verification token, secure hash, validation. | Foundation | P0 | Medium | 2 | In progress |
+| As a user, I want to create an organization, so that my company data has a tenant boundary. | Organization record, owner membership, settings. | Auth | P0 | Medium | 2 | In progress |
 | As an administrator, I want to invite members, so that my team can collaborate. | Invite email, role assignment, expiry, audit event. | Orgs | P0 | Medium | 2 | Planned |
 | As a manager, I want to create projects, so that company context is organized. | CRUD, archive, status, timeline, members. | Orgs | P0 | Medium | 3 | Planned |
 | As an employee, I want to add decisions and notes, so that context is not lost. | Knowledge item types, tags, permissions, project link. | Projects | P0 | Medium | 3 | Planned |
@@ -48,9 +48,20 @@ Tasks:
 - Add demo MongoDB seed script.
 - Add interactive frontend workspace with dashboard, assistant, projects, knowledge, documents, integrations, team, activity, settings, language selector, and 3D knowledge map.
 - Add profile page, profile update state, and logout flow.
+- Add reusable password visibility controls for all password inputs.
+- Add real auth endpoints for registration, login, refresh-token rotation, logout, and current user lookup.
+- Store real auth users, organizations, owner memberships, and sessions in MongoDB.
 - Make language selector update core app labels in multiple languages.
+- Extend translations across landing, login, signup, dashboard, assistant, forms, tables, settings, and 3D map labels.
+- Improve the 3D knowledge map composition with domain labels, centered constellation, orbit rings, and live-context status.
 - Make visible document, integration, settings, and assistant actions provide UI feedback.
 - Switch default seed target to existing local MongoDB at `localhost:27017/novera`, with Docker MongoDB available only through the `docker-mongo` profile.
+- Add Mongo-backed demo API endpoints for workspace data, demo login, and profile update.
+- Connect the frontend workspace to those demo API endpoints with local fallback data when the API is unavailable.
+- Rename seeded demo user credential field from `passwordHash` to `password`.
+- Verify local MongoDB seeded users contain `password` and no longer contain `passwordHash`.
+- Add demo API mutations for creating projects, knowledge items, and document metadata.
+- Wire project, knowledge, and document creation controls to the demo API.
 
 Acceptance criteria:
 
@@ -70,22 +81,32 @@ Acceptance criteria:
 - Safe local Docker ports to avoid common conflicts with other applications.
 - Helper scripts for start, stop, status, full down, Node check, and demo seeding.
 - Frontend routes for landing, login, signup, and app workspace.
+- Password visibility toggle on login and signup fields.
+- Real auth foundation with MongoDB-backed users, organizations, owner memberships, sessions, scrypt password hashing, access tokens, refresh-token rotation, logout, and current-user lookup.
 - Interactive product demo with Acme Studio sample data.
 - Profile page and logout flow.
 - Working language selector for main application labels.
+- Expanded translation coverage across the public landing page, authentication pages, and demo workspace UI.
+- Improved 3D business knowledge map with translated domain labels and a more balanced visual composition.
 - Local MongoDB seed default so the `novera` database appears in the developer's existing MongoDB.
 - Optional Docker MongoDB profile for isolated database testing.
+- Demo workspace API: `GET /api/v1/demo/workspace`.
+- Demo login API: `POST /api/v1/demo/login`.
+- Demo profile update API: `PATCH /api/v1/demo/profile`.
+- Demo project creation API: `POST /api/v1/demo/projects`.
+- Demo knowledge creation API: `POST /api/v1/demo/knowledge-items`.
+- Demo document metadata API: `POST /api/v1/demo/documents`.
 
 ## Still To Do Next
 
-- Replace frontend-only demo login with real backend authentication.
-- Add Mongoose schemas inside the API for users, organizations, sessions, and memberships.
-- Connect login/signup forms to API endpoints.
-- Add real JWT access tokens and refresh token rotation.
+- Replace temporary token helper with a standard audited JWT library before production hardening.
+- Add email verification and password reset flows.
 - Add tenant membership guards.
-- Connect dashboard data to MongoDB instead of local demo data.
+- Replace demo API endpoints with production auth and tenant-checked endpoints.
+- Connect all dashboard data to production API modules instead of demo endpoints.
 - Replace localStorage profile updates with API-backed user profile updates.
-- Expand translation coverage to every paragraph and table label.
+- Translate seeded demo business records or add localized demo datasets if the product demo needs fully localized sample content.
+- Add automated browser regression checks for translation switching and 3D canvas rendering.
 - Add document upload and processing pipeline.
 - Add hybrid search and source-grounded AI retrieval.
 

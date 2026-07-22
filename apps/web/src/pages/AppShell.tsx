@@ -17,8 +17,18 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clearAuth } from '../api/authApi';
+import {
+  createDemoDocument,
+  createDemoKnowledgeItem,
+  createDemoProject,
+  fetchWorkspace,
+  updateDemoProfile,
+  ApiUser,
+  WorkspaceData,
+} from '../api/demoApi';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
@@ -50,7 +60,14 @@ const navItems: Array<{ key: TranslationKey; view: string; icon: typeof Home }> 
 function getStoredUser() {
   try {
     const stored = window.localStorage.getItem('novera-demo-user');
-    return stored ? getDemoUserByEmail(JSON.parse(stored).email) : demoUsers[0];
+    if (!stored) {
+      return demoUsers[0];
+    }
+    const parsed = JSON.parse(stored);
+    const demoUser = getDemoUserByEmail(parsed.email);
+    return demoUser.email === parsed.email
+      ? demoUser
+      : { ...parsed, focus: parsed.focus ?? 'Workspace profile and organization access.' };
   } catch {
     return demoUsers[0];
   }
@@ -65,20 +82,56 @@ export function AppShell() {
   const [assistantAnswer, setAssistantAnswer] = useState('');
   const [currentUser, setCurrentUser] = useState(getStoredUser);
   const [notice, setNotice] = useState('');
+  const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
 
   const t = (key: TranslationKey) => translate(language, key);
 
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingWorkspace(true);
+    fetchWorkspace()
+      .then((data) => {
+        if (isMounted) {
+          setWorkspace(data);
+          if (data.source === 'fallback') {
+            showNotice(t('usingLocalDemoData'));
+          }
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingWorkspace(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const workspaceData = workspace ?? {
+    organization: { name: 'Acme Studio', slug: 'acme-studio', industry: 'Digital agency' },
+    users: demoUsers,
+    projects,
+    knowledgeItems,
+    documents,
+    risks,
+    activities,
+    source: 'fallback' as const,
+  };
+
   const filteredKnowledge = useMemo(() => {
     const normalized = query.toLowerCase();
-    return knowledgeItems.filter((item) =>
+    return workspaceData.knowledgeItems.filter((item) =>
       [item.title, item.summary, item.type, item.project].join(' ').toLowerCase().includes(normalized),
     );
-  }, [query]);
+  }, [query, workspaceData.knowledgeItems]);
 
   function changeLanguage(value: string) {
     setLanguage(value);
     window.localStorage.setItem('novera-language', value);
-    showNotice(`Language changed to ${value.toUpperCase()}`);
+    showNotice(`${t('languageChanged')}: ${value.toUpperCase()}`);
   }
 
   function showNotice(message: string) {
@@ -86,24 +139,36 @@ export function AppShell() {
     window.setTimeout(() => setNotice(''), 2600);
   }
 
+  function replaceWorkspace(data: WorkspaceData, message: string) {
+    setWorkspace(data);
+    showNotice(data.source === 'api' ? message : `${message} locally`);
+  }
+
   function askAssistant(question: string) {
     setAssistantQuestion(question);
-    setAssistantAnswer(
-      'Atlas onboarding is delayed because CRM export credentials are missing. The management decision delayed launch by one week, and the current mitigation is to escalate to the customer sponsor while preparing a fallback CSV import path.',
-    );
+    setAssistantAnswer(t('assistantDemoAnswer'));
     setActiveView('Assistant');
   }
 
   function logout() {
+    clearAuth();
     window.localStorage.removeItem('novera-demo-user');
     navigate('/login');
   }
 
-  function saveProfile(name: string, email: string) {
-    const updated = { ...currentUser, name, email };
+  async function saveProfile(name: string, email: string) {
+    if (!email.endsWith('@novera.test')) {
+      const updated = { ...currentUser, name, email };
+      setCurrentUser(updated);
+      window.localStorage.setItem('novera-demo-user', JSON.stringify(updated));
+      showNotice(t('profileUpdatedLocal'));
+      return;
+    }
+    const saved = await updateDemoProfile(email, name);
+    const updated = { ...currentUser, ...saved, focus: currentUser.focus };
     setCurrentUser(updated);
     window.localStorage.setItem('novera-demo-user', JSON.stringify(updated));
-    showNotice('Profile updated');
+    showNotice(workspaceData.source === 'api' ? t('profileUpdatedMongo') : t('profileUpdatedLocal'));
   }
 
   return (
@@ -132,7 +197,7 @@ export function AppShell() {
           })}
         </nav>
         <div className="absolute bottom-5 left-4 right-4 rounded-ui border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase text-slate-500">Signed in as</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">{t('signedInAs')}</p>
           <p className="mt-1 text-sm font-bold text-ink">{currentUser.name}</p>
           <p className="text-xs text-slate-500">{currentUser.role}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -159,7 +224,7 @@ export function AppShell() {
       <main className="lg:pl-64">
         <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-3">
           <div>
-            <p className="text-sm text-slate-500">Acme Studio</p>
+            <p className="text-sm text-slate-500">{workspaceData.organization.name}</p>
             <h1 className="text-xl font-bold tracking-normal">
               {activeView === 'Profile'
                 ? t('profile')
@@ -186,27 +251,49 @@ export function AppShell() {
         ) : null}
 
         <section className="p-6">
+          {isLoadingWorkspace ? (
+            <div className="mb-4 rounded-ui border border-line bg-white p-4 text-sm font-semibold text-slate-600">
+              {t('loadingWorkspace')}
+            </div>
+          ) : null}
           {activeView === 'Dashboard' ? (
-            <DashboardView onAsk={askAssistant} t={t} />
+            <DashboardView data={workspaceData} onAsk={askAssistant} t={t} />
           ) : activeView === 'Assistant' ? (
             <AssistantView
               answer={assistantAnswer}
               onAsk={askAssistant}
               question={assistantQuestion}
               setQuestion={setAssistantQuestion}
+              t={t}
             />
           ) : activeView === 'Projects' ? (
-            <ProjectsView onAsk={askAssistant} />
+            <ProjectsView
+              data={workspaceData}
+              onAsk={askAssistant}
+              onCreateProject={(data) => replaceWorkspace(data, t('projectCreated'))}
+              t={t}
+            />
           ) : activeView === 'Knowledge' ? (
-            <KnowledgeView items={filteredKnowledge} query={query} setQuery={setQuery} t={t} />
+            <KnowledgeView
+              items={filteredKnowledge}
+              onCreateKnowledge={(data) => replaceWorkspace(data, t('knowledgeItemCreated'))}
+              query={query}
+              setQuery={setQuery}
+              t={t}
+            />
           ) : activeView === 'Documents' ? (
-            <DocumentsView showNotice={showNotice} t={t} />
+            <DocumentsView
+              data={workspaceData}
+              onCreateDocument={(data) => replaceWorkspace(data, t('documentMetadataCreated'))}
+              showNotice={showNotice}
+              t={t}
+            />
           ) : activeView === 'Integrations' ? (
             <IntegrationsView showNotice={showNotice} t={t} />
           ) : activeView === 'Team' ? (
-            <TeamView t={t} />
+            <TeamView data={workspaceData} t={t} />
           ) : activeView === 'Activity' ? (
-            <ActivityView t={t} />
+            <ActivityView data={workspaceData} t={t} />
           ) : activeView === 'Profile' ? (
             <ProfileView currentUser={currentUser} onSave={saveProfile} t={t} />
           ) : (
@@ -218,16 +305,24 @@ export function AppShell() {
   );
 }
 
-function DashboardView({ onAsk, t }: { onAsk: (question: string) => void; t: (key: TranslationKey) => string }) {
+function DashboardView({
+  data,
+  onAsk,
+  t,
+}: {
+  data: WorkspaceData;
+  onAsk: (question: string) => void;
+  t: (key: TranslationKey) => string;
+}) {
   return (
     <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
       <div className="space-y-5">
         <div className="grid gap-4 md:grid-cols-4">
           {[
-            [t('activeProjects'), '3', FolderKanban],
-            [t('openRisks'), '2', AlertTriangle],
-            [t('recentDecisions'), '4', CheckCircle2],
-            [t('documents'), '3', FileText],
+            [t('activeProjects'), String(data.projects.length), FolderKanban],
+            [t('openRisks'), String(data.risks.length), AlertTriangle],
+            [t('recentDecisions'), String(data.knowledgeItems.filter((item) => item.type === 'Decision').length), CheckCircle2],
+            [t('documents'), String(data.documents.length), FileText],
           ].map(([label, value, Icon]) => (
             <div key={label as string} className="rounded-ui border border-line bg-white p-4 shadow-sm">
               <Icon className="text-teal" size={20} aria-hidden="true" />
@@ -253,12 +348,12 @@ function DashboardView({ onAsk, t }: { onAsk: (question: string) => void; t: (ke
             </button>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {['Escalate Atlas credentials', 'Approve Q3 retainer scope', 'Confirm finance portal permissions'].map(
+            {['priorityAtlasCredentials', 'priorityRetainerScope', 'priorityFinancePermissions'].map(
               (priority) => (
                 <div key={priority} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-800">{priority}</p>
+                  <p className="text-sm font-semibold text-slate-800">{t(priority)}</p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Linked to project status, recent decisions, and risk activity.
+                    {t('linkedToActivity')}
                   </p>
                 </div>
               ),
@@ -266,12 +361,18 @@ function DashboardView({ onAsk, t }: { onAsk: (question: string) => void; t: (ke
           </div>
         </div>
 
-        <ProjectTable onAsk={onAsk} t={t} />
+        <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       </div>
 
       <div className="space-y-5">
-        <KnowledgeTwinCanvas title={t('businessTwin')} subtitle={t('liveKnowledgeMap')} />
-        <RiskPanel t={t} />
+        <KnowledgeTwinCanvas
+          domainLabels={[t('projects'), t('docs'), t('decisions'), t('currentRisks'), t('team'), t('customers')]}
+          linkedDomainsLabel={t('domainsLinked')}
+          liveContextLabel={t('liveContext')}
+          title={t('businessTwin')}
+          subtitle={t('liveKnowledgeMap')}
+        />
+        <RiskPanel risks={data.risks} t={t} />
       </div>
     </div>
   );
@@ -282,16 +383,18 @@ function AssistantView({
   onAsk,
   question,
   setQuestion,
+  t,
 }: {
   answer: string;
   onAsk: (question: string) => void;
   question: string;
   setQuestion: (question: string) => void;
+  t: (key: TranslationKey) => string;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
       <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-bold tracking-normal">Ask the business memory</h2>
+        <h2 className="text-lg font-bold tracking-normal">{t('askBusinessMemory')}</h2>
         <textarea
           className="mt-4 min-h-32 w-full rounded-ui border border-line p-3 text-sm outline-none focus:ring-2 focus:ring-signal"
           value={question}
@@ -303,7 +406,7 @@ function AssistantView({
           onClick={() => onAsk(question)}
         >
           <Bot size={17} aria-hidden="true" />
-          Generate answer
+          {t('generateAnswer')}
         </button>
         <div className="mt-5 grid gap-2">
           {assistantQuestions.map((sample) => (
@@ -320,10 +423,9 @@ function AssistantView({
       </div>
 
       <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
-        <p className="text-sm font-semibold text-teal">Answer</p>
+        <p className="text-sm font-semibold text-teal">{t('answer')}</p>
         <p className="mt-3 text-base leading-7 text-slate-700">
-          {answer ||
-            'Ask a question to receive a grounded answer from the demo workspace. Novera will show sources and limitations instead of inventing information.'}
+          {answer || t('assistantEmpty')}
         </p>
         <div className="mt-5 grid gap-3">
           {knowledgeItems.slice(0, 3).map((source) => (
@@ -334,25 +436,68 @@ function AssistantView({
           ))}
         </div>
         <p className="mt-4 rounded-ui bg-blue-50 p-3 text-sm font-medium text-blue-800">
-          Confidence: medium-high. Limitation: this is demo data until real ingestion and retrieval
-          are connected.
+          {t('assistantConfidence')}
         </p>
       </div>
     </div>
   );
 }
 
-function ProjectsView({ onAsk }: { onAsk: (question: string) => void }) {
+function ProjectsView({
+  data,
+  onAsk,
+  onCreateProject,
+  t,
+}: {
+  data: WorkspaceData;
+  onAsk: (question: string) => void;
+  onCreateProject: (data: WorkspaceData) => void;
+  t: (key: TranslationKey) => string;
+}) {
+  const [name, setName] = useState('New client launch');
+  const [owner, setOwner] = useState('Mira Chen');
+  const [summary, setSummary] = useState('Plan and track a new customer launch workspace.');
+
+  async function submitProject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onCreateProject(await createDemoProject({ name, owner, summary }));
+  }
+
   return (
     <div className="space-y-5">
-      <ProjectTable onAsk={onAsk} t={(key) => translate('en', key)} />
+      <form className="rounded-ui border border-line bg-white p-5 shadow-sm" onSubmit={submitProject}>
+        <h2 className="text-lg font-bold tracking-normal">{t('createProject')}</h2>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_1.2fr_auto]">
+          <input
+            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <input
+            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+          />
+          <input
+            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+          />
+          <button className="h-10 rounded-ui bg-teal px-4 text-sm font-semibold text-white" type="submit">
+            {t('create')}
+          </button>
+        </div>
+      </form>
+      <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       <div className="grid gap-4 lg:grid-cols-3">
-        {projects.map((project) => (
+        {data.projects.map((project) => (
           <div key={project.name} className="rounded-ui border border-line bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
-                <p className="mt-1 text-sm text-slate-500">Owner: {project.owner}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {t('owner')}: {project.owner}
+                </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                 {project.status}
@@ -362,7 +507,9 @@ function ProjectsView({ onAsk }: { onAsk: (question: string) => void }) {
             <div className="mt-4 h-2 rounded-full bg-slate-100">
               <div className="h-2 rounded-full bg-teal" style={{ width: `${project.progress}%` }} />
             </div>
-            <p className="mt-2 text-xs font-semibold text-slate-500">{project.progress}% complete</p>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              {project.progress}% {t('complete')}
+            </p>
           </div>
         ))}
       </div>
@@ -372,32 +519,57 @@ function ProjectsView({ onAsk }: { onAsk: (question: string) => void }) {
 
 function KnowledgeView({
   items,
+  onCreateKnowledge,
   query,
   setQuery,
   t,
 }: {
   items: typeof knowledgeItems;
+  onCreateKnowledge: (data: WorkspaceData) => void;
   query: string;
   setQuery: (query: string) => void;
   t: (key: TranslationKey) => string;
 }) {
+  const [title, setTitle] = useState('New customer decision');
+
+  async function submitKnowledge(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onCreateKnowledge(
+      await createDemoKnowledgeItem({
+        title,
+        type: 'decision',
+        summary: 'A new decision was captured from the workspace.',
+      }),
+    );
+  }
+
   return (
     <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-teal">Knowledge explorer</p>
+          <p className="text-sm font-semibold text-teal">{t('knowledgeExplorer')}</p>
           <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('searchCompanyMemory')}</h2>
         </div>
         <label className="flex h-10 min-w-72 items-center gap-2 rounded-ui border border-line px-3">
           <Search size={17} className="text-slate-400" aria-hidden="true" />
           <input
             className="w-full border-0 bg-transparent text-sm outline-none"
-            placeholder="Search decisions, meetings, risks..."
+            placeholder={t('searchPlaceholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
       </div>
+      <form className="mt-5 flex flex-wrap gap-3" onSubmit={submitKnowledge}>
+        <input
+          className="h-10 min-w-72 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <button className="h-10 rounded-ui bg-teal px-4 text-sm font-semibold text-white" type="submit">
+          {t('addKnowledge')}
+        </button>
+      </form>
       <div className="mt-5 grid gap-3">
         {items.map((item) => (
           <div key={item.title} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
@@ -417,12 +589,24 @@ function KnowledgeView({
 }
 
 function DocumentsView({
+  data,
+  onCreateDocument,
   showNotice,
   t,
 }: {
+  data: WorkspaceData;
+  onCreateDocument: (data: WorkspaceData) => void;
   showNotice: (message: string) => void;
   t: (key: TranslationKey) => string;
 }) {
+  const [title, setTitle] = useState('New uploaded document');
+  const [type, setType] = useState('PDF');
+
+  async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onCreateDocument(await createDemoDocument({ title, type }));
+  }
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_0.45fr]">
       <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
@@ -431,14 +615,14 @@ function DocumentsView({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-semibold">Document</th>
-                <th className="px-4 py-3 font-semibold">Project</th>
-                <th className="px-4 py-3 font-semibold">Type</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">{t('document')}</th>
+                <th className="px-4 py-3 font-semibold">{t('project')}</th>
+                <th className="px-4 py-3 font-semibold">{t('type')}</th>
+                <th className="px-4 py-3 font-semibold">{t('status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {documents.map((document) => (
+              {data.documents.map((document) => (
                 <tr key={document.title}>
                   <td className="px-4 py-3 font-medium text-slate-800">{document.title}</td>
                   <td className="px-4 py-3 text-slate-600">{document.project}</td>
@@ -450,20 +634,38 @@ function DocumentsView({
           </table>
         </div>
       </div>
-      <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+      <form className="rounded-ui border border-line bg-white p-5 shadow-sm" onSubmit={submitDocument}>
         <Upload className="text-teal" size={24} aria-hidden="true" />
         <h3 className="mt-4 text-lg font-bold tracking-normal">{t('uploadDocument')}</h3>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          PDF, DOCX, TXT, and Markdown uploads will connect to real storage in the documents milestone.
+          {t('documentUploadHelp')}
         </p>
-        <button
-          className="mt-4 h-10 rounded-ui bg-ink px-4 text-sm font-semibold text-white"
-          type="button"
-          onClick={() => showNotice('Document upload workflow queued for backend connection')}
+        <input
+          className="mt-4 h-10 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <select
+          className="mt-3 h-10 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          value={type}
+          onChange={(event) => setType(event.target.value)}
         >
-          Select file
+          <option>PDF</option>
+          <option>DOCX</option>
+          <option>Markdown</option>
+          <option>TXT</option>
+        </select>
+        <button className="mt-4 h-10 rounded-ui bg-ink px-4 text-sm font-semibold text-white" type="submit">
+          {t('addDocument')}
         </button>
-      </div>
+        <button
+          className="ml-2 mt-4 h-10 rounded-ui border border-line px-4 text-sm font-semibold text-slate-700"
+          type="button"
+          onClick={() => showNotice(t('fileUploadLater'))}
+        >
+          {t('selectFile')}
+        </button>
+      </form>
     </div>
   );
 }
@@ -483,12 +685,12 @@ function IntegrationsView({
           <Plug className="text-signal" size={22} aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold tracking-normal">{integration}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Connection prepared for the integration architecture.
+            {t('integrationPrepared')}
           </p>
           <button
             className="mt-4 h-9 rounded-ui border border-line px-3 text-sm font-semibold text-slate-700"
             type="button"
-            onClick={() => showNotice(`${integration} connection will be enabled after OAuth setup`)}
+            onClick={() => showNotice(`${integration} ${t('integrationLater')}`)}
           >
             {t('connect')}
           </button>
@@ -498,12 +700,12 @@ function IntegrationsView({
   );
 }
 
-function TeamView({ t }: { t: (key: TranslationKey) => string }) {
+function TeamView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) => string }) {
   return (
     <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
       <h2 className="text-2xl font-bold tracking-normal">{t('teamPermissions')}</h2>
       <div className="mt-5 grid gap-3">
-        {demoUsers.map((user) => (
+        {data.users.map((user) => (
           <div
             key={user.email}
             className="flex flex-wrap items-center justify-between gap-3 rounded-ui border border-slate-200 bg-slate-50 p-4"
@@ -523,12 +725,12 @@ function TeamView({ t }: { t: (key: TranslationKey) => string }) {
   );
 }
 
-function ActivityView({ t }: { t: (key: TranslationKey) => string }) {
+function ActivityView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) => string }) {
   return (
     <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
       <h2 className="text-2xl font-bold tracking-normal">{t('activityTimeline')}</h2>
       <div className="mt-5 grid gap-3">
-        {activities.map((item) => (
+        {data.activities.map((item) => (
           <div key={`${item.actor}-${item.target}`} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-800">
               {item.actor} {item.action}
@@ -547,7 +749,7 @@ function ProfileView({
   onSave,
   t,
 }: {
-  currentUser: (typeof demoUsers)[number];
+  currentUser: ApiUser;
   onSave: (name: string, email: string) => void;
   t: (key: TranslationKey) => string;
 }) {
@@ -572,7 +774,7 @@ function ProfileView({
       >
         <h2 className="text-2xl font-bold tracking-normal">{t('profile')}</h2>
         <label className="mt-5 block">
-          <span className="text-sm font-semibold text-slate-700">Name</span>
+          <span className="text-sm font-semibold text-slate-700">{t('name')}</span>
           <input
             className="mt-2 h-11 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
             value={name}
@@ -580,7 +782,7 @@ function ProfileView({
           />
         </label>
         <label className="mt-4 block">
-          <span className="text-sm font-semibold text-slate-700">Email</span>
+          <span className="text-sm font-semibold text-slate-700">{t('email')}</span>
           <input
             className="mt-2 h-11 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
             type="email"
@@ -606,9 +808,9 @@ function SettingsView({
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       {[
-        ['Organization', 'Acme Studio workspace profile and industry settings.'],
-        ['Security', 'Role permissions, audit logs, and source authorization.'],
-        ['AI provider', 'Provider-independent assistant settings and token tracking.'],
+        [t('organization'), t('organizationSettingsBody')],
+        [t('security'), t('securitySettingsBody')],
+        [t('aiProvider'), t('aiProviderSettingsBody')],
       ].map(([title, body]) => (
         <div key={title} className="rounded-ui border border-line bg-white p-5 shadow-sm">
           <ShieldCheck className="text-teal" size={22} aria-hidden="true" />
@@ -617,7 +819,7 @@ function SettingsView({
           <button
             className="mt-4 h-9 rounded-ui border border-line px-3 text-sm font-semibold text-slate-700"
             type="button"
-            onClick={() => showNotice(`${title} settings saved locally`)}
+            onClick={() => showNotice(`${title} ${t('settingsSavedLocal')}`)}
           >
             {t('saveChanges')}
           </button>
@@ -629,9 +831,11 @@ function SettingsView({
 
 function ProjectTable({
   onAsk,
+  projects,
   t,
 }: {
   onAsk: (question: string) => void;
+  projects: WorkspaceData['projects'];
   t: (key: TranslationKey) => string;
 }) {
   return (
@@ -641,11 +845,11 @@ function ProjectTable({
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-semibold">Project</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Risk</th>
-              <th className="px-4 py-3 font-semibold">Owner</th>
-              <th className="px-4 py-3 font-semibold">Action</th>
+              <th className="px-4 py-3 font-semibold">{t('project')}</th>
+              <th className="px-4 py-3 font-semibold">{t('status')}</th>
+              <th className="px-4 py-3 font-semibold">{t('risk')}</th>
+              <th className="px-4 py-3 font-semibold">{t('owner')}</th>
+              <th className="px-4 py-3 font-semibold">{t('action')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -661,7 +865,7 @@ function ProjectTable({
                     type="button"
                     onClick={() => onAsk(`Why is ${project.name} ${project.status.toLowerCase()}?`)}
                   >
-                    Ask why
+                    {t('askWhy')}
                   </button>
                 </td>
               </tr>
@@ -673,7 +877,7 @@ function ProjectTable({
   );
 }
 
-function RiskPanel({ t }: { t: (key: TranslationKey) => string }) {
+function RiskPanel({ risks, t }: { risks: WorkspaceData['risks']; t: (key: TranslationKey) => string }) {
   return (
     <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
       <h2 className="text-lg font-bold tracking-normal">{t('currentRisks')}</h2>

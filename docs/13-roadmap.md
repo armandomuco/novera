@@ -10,7 +10,7 @@ Complexity: Medium.
 
 Objective: create repo, docs, environments, API, web, Docker, linting, tests.
 Status: mostly complete.
-Deliverables: runnable skeleton, helper scripts, safe Docker ports, frontend demo routes, demo seed script, and updated documentation.
+Deliverables: runnable skeleton, helper scripts, safe Docker ports, frontend demo routes, demo seed script, Mongo-backed demo API endpoints, and updated documentation.
 Complexity: Medium.
 
 ## Milestone 2: Authentication And Organizations
@@ -18,6 +18,7 @@ Complexity: Medium.
 Objective: secure user, session, organization, invitation, and role flows.
 Dependencies: foundation.
 Deliverables: auth APIs and tenant guard.
+Status: started. Register, login, refresh, logout, me, password hashing, session storage, and initial owner organization creation are implemented.
 Complexity: High.
 
 ## Milestone 3: Projects And Knowledge

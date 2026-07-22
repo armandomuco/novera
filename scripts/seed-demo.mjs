@@ -20,7 +20,7 @@ const schemas = {
   User: new mongoose.Schema(
     {
       email: { type: String, required: true, unique: true, index: true },
-      passwordHash: { type: String, required: true },
+      password: { type: String, required: true },
       name: { type: String, required: true },
       roleLabel: { type: String, required: true },
       status: { type: String, required: true },
@@ -169,6 +169,7 @@ async function upsertDemoData() {
       {
         $set: {
           email,
+          password: hashPassword(DEMO_PASSWORD),
           name,
           roleLabel,
           status: 'active',
@@ -176,8 +177,10 @@ async function upsertDemoData() {
           updatedAt: new Date(),
           deletedAt: null,
         },
+        $unset: {
+          passwordHash: '',
+        },
         $setOnInsert: {
-          passwordHash: hashPassword(DEMO_PASSWORD),
           createdAt: new Date(),
         },
       },
@@ -185,6 +188,14 @@ async function upsertDemoData() {
     );
     users.set(roleLabel, user);
   }
+  await mongoose.connection.db.collection('users').updateMany(
+    { email: /@novera\.test$/ },
+    {
+      $unset: {
+        passwordHash: '',
+      },
+    },
+  );
 
   const owner = users.get('Owner');
   const organization = await Organization.findOneAndUpdate(

@@ -68,6 +68,8 @@ The script creates or updates these collections:
 
 It does not delete or modify other databases.
 
+The demo user field is named `password`. The seed script stores a hashed scrypt value in that field and removes the older `passwordHash` field from seeded demo users.
+
 ## Demo Projects
 
 | Project | Status | Risk | Owner | Summary |

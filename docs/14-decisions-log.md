@@ -23,3 +23,9 @@ Trade-offs: aligns with requested stack and flexible metadata. PostgreSQL with p
 Decision: integrations are represented architecturally and in UI first. Implement one simple integration after auth, organizations, projects, documents, and AI retrieval are stable.
 
 Trade-offs: avoids spending the MVP on OAuth plumbing before the core value is demonstrated.
+
+## 2026-07-22: Use `password` Field For Seeded Demo Credentials
+
+Decision: seeded demo users store the scrypt-hashed credential value in a field named `password`.
+
+Trade-offs: this matches the current project naming request and keeps demo data easy to inspect in MongoDB. The value remains hashed, and the old `passwordHash` field is removed by the seed script for seeded `@novera.test` users.

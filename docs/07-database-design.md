@@ -15,7 +15,7 @@ Decision: use MongoDB Atlas Vector Search for the MVP, with an embedding reposit
 ### users
 
 Purpose: account identity.
-Fields: email, passwordHash, name, avatarUrl, emailVerifiedAt, status, createdAt, updatedAt, deletedAt.
+Fields: email, password, name, avatarUrl, emailVerifiedAt, status, createdAt, updatedAt, deletedAt.
 Indexes: unique email, status.
 Tenancy: user may belong to many organizations through organizationMembers.
 

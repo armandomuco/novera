@@ -31,10 +31,13 @@ Base path: `/api/v1`.
 - `POST /auth/login`: create access and refresh tokens. Public. Rate limited.
 - `POST /auth/logout`: revoke active session. Authenticated.
 - `POST /auth/refresh`: rotate refresh token. Public with valid refresh token.
+- `GET /auth/me`: return the authenticated user and active organization from the bearer access token.
 - `POST /auth/password-reset/request`: send reset email. Public, rate limited.
 - `POST /auth/password-reset/confirm`: set new password. Public with reset token.
 - `POST /auth/email/verify`: verify email. Public with verification token.
 - `GET /auth/status`: returns auth module health. Public for MVP scaffolding.
+
+Current implementation note: register, login, refresh, logout, and me are implemented with MongoDB-backed users, organizations, organization memberships, sessions, scrypt password hashing, HMAC-signed JWT-compatible tokens, refresh-token rotation, and hashed refresh-token storage. Password reset and email verification remain planned.
 
 ## Organizations
 
@@ -84,6 +87,19 @@ Base path: `/api/v1`.
 ## Activity
 
 - `GET /organizations/:organizationId/activity`: timeline. Member+. Filters by eventType, entityType, projectId, dateRange.
+
+## Demo
+
+These endpoints support the current local MVP demo while the production authentication and tenant modules are being built.
+
+- `GET /demo/workspace`: returns the seeded Acme Studio workspace from MongoDB. Public in local demo only.
+- `POST /demo/login`: returns a seeded demo user by email. Public in local demo only.
+- `PATCH /demo/profile`: updates a seeded demo user's display name. Public in local demo only.
+- `POST /demo/projects`: creates a demo project and records activity. Public in local demo only.
+- `POST /demo/knowledge-items`: creates a demo knowledge item and records activity. Public in local demo only.
+- `POST /demo/documents`: creates demo document metadata and records activity. Public in local demo only.
+
+These endpoints must be replaced by authenticated, tenant-checked production endpoints before a real launch.
 
 ## Integrations
 
