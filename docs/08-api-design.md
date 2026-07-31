@@ -37,13 +37,13 @@ Base path: `/api/v1`.
 - `POST /auth/email/verify`: verify email. Public with verification token.
 - `GET /auth/status`: returns auth module health. Public for MVP scaffolding.
 
-Current implementation note: register, login, refresh, logout, and me are implemented with MongoDB-backed users, organizations, organization memberships, sessions, scrypt password hashing, HMAC-signed JWT-compatible tokens, refresh-token rotation, and hashed refresh-token storage. Password reset and email verification remain planned.
+Current implementation note: register, login, refresh, logout, and me are implemented with MongoDB-backed users, organizations, organization memberships, sessions, scrypt password hashing, HMAC-signed JWT-compatible tokens, refresh-token rotation, and hashed refresh-token storage. Fresh access tokens are accepted by protected production routes after membership and tenant validation. Password reset and email verification remain planned.
 
 ## Organizations
 
-- `POST /organizations`: create organization. Authenticated.
-- `GET /organizations`: list memberships. Authenticated.
-- `GET /organizations/:organizationId`: get organization. Member.
+- `POST /organizations`: create organization. Authenticated. Planned after initial owner organization creation.
+- `GET /organizations`: list memberships. Authenticated. Implemented.
+- `GET /organizations/:organizationId`: get organization. Member. Implemented with membership validation.
 - `PATCH /organizations/:organizationId`: update settings. Administrator+.
 - `POST /organizations/:organizationId/invitations`: invite member. Administrator+.
 - `POST /organizations/:organizationId/switch`: set active org context. Member.
@@ -51,20 +51,20 @@ Current implementation note: register, login, refresh, logout, and me are implem
 
 ## Projects
 
-- `POST /organizations/:organizationId/projects`: create project. Manager+.
-- `GET /organizations/:organizationId/projects`: paginated list. Member with permission.
-- `GET /organizations/:organizationId/projects/:projectId`: project detail. Project member or org role.
-- `PATCH /organizations/:organizationId/projects/:projectId`: update project. Manager+.
-- `POST /organizations/:organizationId/projects/:projectId/archive`: archive. Manager+.
+- `POST /projects`: create project. Owner, Administrator, or Manager. Implemented with tenant validation.
+- `GET /projects`: paginated list. Member with permission. Implemented with active organization default and optional organization filter.
+- `GET /projects/:projectId`: project detail. Implemented with project organization membership validation.
+- `PATCH /projects/:projectId`: update project. Owner, Administrator, or Manager. Implemented.
+- `DELETE /projects/:projectId`: archive. Owner, Administrator, or Manager. Implemented as soft deletion.
 - `POST /organizations/:organizationId/projects/:projectId/members`: assign member. Manager+.
 
 ## Knowledge Items
 
-- `POST /organizations/:organizationId/knowledge-items`: create item. Member+.
-- `GET /organizations/:organizationId/knowledge-items`: search/filter list. Member+.
-- `GET /organizations/:organizationId/knowledge-items/:id`: retrieve item. Authorized source access.
-- `PATCH /organizations/:organizationId/knowledge-items/:id`: update item. Creator, Manager+.
-- `DELETE /organizations/:organizationId/knowledge-items/:id`: soft delete. Creator, Manager+.
+- `POST /knowledge-items`: create item. Member+. Implemented with tenant validation and optional project validation.
+- `GET /knowledge-items`: list/filter items. Member+. Implemented with organization, project, and type filters.
+- `GET /knowledge-items/:itemId`: retrieve item. Implemented with tenant validation.
+- `PATCH /knowledge-items/:itemId`: update item. Member+. Implemented with soft re-embedding status reset when content changes.
+- `DELETE /knowledge-items/:itemId`: soft delete. Member+. Implemented as archive.
 
 ## Documents
 
@@ -86,7 +86,9 @@ Current implementation note: register, login, refresh, logout, and me are implem
 
 ## Activity
 
-- `GET /organizations/:organizationId/activity`: timeline. Member+. Filters by eventType, entityType, projectId, dateRange.
+- `GET /activity`: timeline. Member+. Implemented with active organization default and optional organization filter.
+
+Current implementation note: project create/update/archive and knowledge create/update/archive record activity events.
 
 ## Demo
 
@@ -100,6 +102,8 @@ These endpoints support the current local MVP demo while the production authenti
 - `POST /demo/documents`: creates demo document metadata and records activity. Public in local demo only.
 
 These endpoints must be replaced by authenticated, tenant-checked production endpoints before a real launch.
+
+Frontend usage note: demo users with `@novera.test` still use these seeded demo endpoints. Non-demo users use the production `auth/me`, `projects`, `knowledge-items`, and `activity` endpoints for workspace loading and creation.
 
 ## Integrations
 

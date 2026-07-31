@@ -2,11 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ActivityModule } from './activity/activity.module';
 import { AuthModule } from './auth/auth.module';
 import { validateEnvironment } from './common/config/env.validation';
 import { DemoModule } from './demo/demo.module';
 import { HealthModule } from './health/health.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -21,9 +24,12 @@ import { OrganizationsModule } from './organizations/organizations.module';
         serverSelectionTimeoutMS: 3000,
       }),
     }),
+    ActivityModule,
     HealthModule,
     AuthModule,
     OrganizationsModule,
+    ProjectsModule,
+    KnowledgeModule,
     DemoModule,
   ],
 })

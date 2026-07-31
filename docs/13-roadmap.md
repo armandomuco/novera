@@ -18,7 +18,7 @@ Complexity: Medium.
 Objective: secure user, session, organization, invitation, and role flows.
 Dependencies: foundation.
 Deliverables: auth APIs and tenant guard.
-Status: started. Register, login, refresh, logout, me, password hashing, session storage, and initial owner organization creation are implemented.
+Status: started. Register, login, refresh, logout, me, password hashing, session storage, initial owner organization creation, organization membership reads, and protected access-token validation are implemented. Invitation, email verification, password reset, and organization switching remain.
 Complexity: High.
 
 ## Milestone 3: Projects And Knowledge
@@ -26,6 +26,7 @@ Complexity: High.
 Objective: capture structured operating memory.
 Dependencies: auth/orgs.
 Deliverables: projects, knowledge items, decisions, activity.
+Status: started. Tenant-scoped projects and knowledge items can be created, listed, read, updated, and archived through authenticated API endpoints. Activity events are recorded for project and knowledge changes. The frontend now uses these production APIs for non-demo accounts while keeping the seeded demo workspace for `@novera.test` users.
 Complexity: High.
 
 ## Milestone 4: Documents
@@ -46,7 +47,7 @@ Complexity: Very high.
 
 Objective: polished app shell and end-to-end user experience.
 Dependencies: core APIs.
-Status: in progress.
+Status: in progress. Real signup lands in the user's own organization, and project/knowledge creation persists through production APIs. Documents, profile, settings, and assistant still need production API backing.
 Deliverables: landing, login, signup, dashboard, explorer, assistant, projects, documents, integrations, team, activity, settings, language selector, and initial 3D knowledge-map visual.
 Complexity: High.
 

@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { LoginDto, RegisterDto } from './auth.dto';
 import { AuthOrganization, AuthOrganizationMember, AuthSession, AuthUser } from './auth.schemas';
+import { AuthContext } from './auth.types';
 
 type TokenPayload = {
   sub: string;
@@ -164,9 +165,9 @@ export class AuthService {
   }
 
   async me(authorization?: string) {
-    const payload = this.verifyAuthorization(authorization);
-    const userId = new Types.ObjectId(payload.sub);
-    const organizationId = new Types.ObjectId(payload.organizationId);
+    const auth = await this.authenticateAccessToken(authorization);
+    const userId = new Types.ObjectId(auth.userId);
+    const organizationId = new Types.ObjectId(auth.organizationId);
     const [user, membership, organization] = await Promise.all([
       this.userModel.findOne({ _id: userId, deletedAt: null }).lean(),
       this.organizationMemberModel
@@ -187,6 +188,32 @@ export class AuthService {
           slug: organization.slug,
         },
       },
+    };
+  }
+
+  async authenticateAccessToken(authorization?: string): Promise<AuthContext> {
+    const payload = this.verifyAuthorization(authorization);
+    const userId = new Types.ObjectId(payload.sub);
+    const organizationId = new Types.ObjectId(payload.organizationId);
+    const [user, membership, organization] = await Promise.all([
+      this.userModel.exists({ _id: userId, deletedAt: null }),
+      this.organizationMemberModel
+        .findOne({
+          userId,
+          organizationId,
+          status: 'active',
+        })
+        .lean(),
+      this.organizationModel.exists({ _id: organizationId, deletedAt: null }),
+    ]);
+    if (!user || !membership || !organization) {
+      throw new UnauthorizedException('Session is no longer valid.');
+    }
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      organizationId: payload.organizationId,
+      role: membership.role,
     };
   }
 

@@ -54,3 +54,48 @@ export function persistAuth(payload: AuthPayload) {
 export function clearAuth() {
   window.localStorage.removeItem('novera-auth');
 }
+
+export function getStoredAuth(): AuthPayload | null {
+  try {
+    const stored = window.localStorage.getItem('novera-auth');
+    return stored ? (JSON.parse(stored) as AuthPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function authenticatedFetch(path: string, options: RequestInit = {}) {
+  const auth = getStoredAuth();
+  if (!auth) {
+    throw new Error('Missing authenticated session.');
+  }
+  const response = await fetch(path, withAuthHeaders(options, auth.accessToken));
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const refreshResponse = await fetch('/api/v1/auth/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken: auth.refreshToken }),
+  });
+  if (!refreshResponse.ok) {
+    clearAuth();
+    throw new Error('Session expired.');
+  }
+  const payload = (await refreshResponse.json()) as ApiResponse<Pick<AuthPayload, 'accessToken' | 'refreshToken'>>;
+  const nextAuth = { ...auth, ...payload.data };
+  persistAuth(nextAuth);
+  return fetch(path, withAuthHeaders(options, nextAuth.accessToken));
+}
+
+function withAuthHeaders(options: RequestInit, accessToken: string): RequestInit {
+  return {
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers ?? {}),
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
+}

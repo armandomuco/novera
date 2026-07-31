@@ -16,6 +16,7 @@ export function SignupPage() {
   const [organizationName, setOrganizationName] = useState('Acme Studio');
   const [password, setPassword] = useState('DemoPass123!');
   const t = (key: string) => translate(language, key);
+  const isDemoEmail = email.trim().toLowerCase().endsWith('@novera.test');
 
   function changeLanguage(value: string) {
     setLanguage(value);
@@ -25,7 +26,7 @@ export function SignupPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      if (email.endsWith('@novera.test')) {
+      if (isDemoEmail) {
         window.localStorage.setItem('novera-demo-user', JSON.stringify(demoUsers[0]));
       } else {
         await registerUser({ name, email, password, organizationName });
@@ -55,7 +56,7 @@ export function SignupPage() {
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-normal">{t('signupTitle')}</h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
-            {t('signupBody')}
+            {isDemoEmail ? t('signupDemoBody') : t('signupBody')}
           </p>
         </div>
 
@@ -118,7 +119,7 @@ export function SignupPage() {
               onClick={() => setMessage('')}
               type="submit"
             >
-              {t('createDemoWorkspace')}
+              {isDemoEmail ? t('createDemoWorkspace') : t('createWorkspace')}
               <ArrowRight size={17} aria-hidden="true" />
             </button>
           </div>

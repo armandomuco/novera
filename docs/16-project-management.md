@@ -8,7 +8,7 @@
 | Monorepo foundation | Done | P0 | Medium | 1 |
 | Authentication and sessions | In progress | P0 | High | 2 |
 | Organizations and permissions | In progress | P0 | High | 2 |
-| Projects and knowledge items | Planned | P0 | High | 3 |
+| Projects and knowledge items | In progress | P0 | High | 3 |
 | Documents and processing | Planned | P0 | High | 4 |
 | Hybrid search and AI assistant | Planned | P0 | Very high | 5 |
 | Demo-ready UI | In progress | P0 | High | 6 |
@@ -23,8 +23,8 @@
 | As a user, I want to register and verify my email, so that my account is trusted. | Email, password, verification token, secure hash, validation. | Foundation | P0 | Medium | 2 | In progress |
 | As a user, I want to create an organization, so that my company data has a tenant boundary. | Organization record, owner membership, settings. | Auth | P0 | Medium | 2 | In progress |
 | As an administrator, I want to invite members, so that my team can collaborate. | Invite email, role assignment, expiry, audit event. | Orgs | P0 | Medium | 2 | Planned |
-| As a manager, I want to create projects, so that company context is organized. | CRUD, archive, status, timeline, members. | Orgs | P0 | Medium | 3 | Planned |
-| As an employee, I want to add decisions and notes, so that context is not lost. | Knowledge item types, tags, permissions, project link. | Projects | P0 | Medium | 3 | Planned |
+| As a manager, I want to create projects, so that company context is organized. | CRUD, archive, status, timeline, members. | Orgs | P0 | Medium | 3 | In progress |
+| As an employee, I want to add decisions and notes, so that context is not lost. | Knowledge item types, tags, permissions, project link. | Projects | P0 | Medium | 3 | In progress |
 | As an employee, I want to upload documents, so that they become searchable. | File validation, storage, metadata, processing status. | Knowledge | P0 | High | 4 | Planned |
 | As a manager, I want to ask why a project is delayed, so that I can act faster. | Answer uses authorized sources, citations, limits, related records. | Search/docs | P0 | Very high | 5 | Planned |
 | As an owner, I want a dashboard of risks and priorities, so that I know what to focus on. | Active projects, risks, recent decisions, documents, suggested priorities. | Projects/knowledge | P0 | Medium | 6 | In progress |
@@ -51,6 +51,10 @@ Tasks:
 - Add reusable password visibility controls for all password inputs.
 - Add real auth endpoints for registration, login, refresh-token rotation, logout, and current user lookup.
 - Store real auth users, organizations, owner memberships, and sessions in MongoDB.
+- Add authenticated organization membership read endpoints.
+- Add tenant-validated project create, list, read, update, and archive endpoints.
+- Add tenant-validated knowledge item create, list, read, update, and archive endpoints.
+- Add activity-event recording for project and knowledge item changes.
 - Make language selector update core app labels in multiple languages.
 - Extend translations across landing, login, signup, dashboard, assistant, forms, tables, settings, and 3D map labels.
 - Improve the 3D knowledge map composition with domain labels, centered constellation, orbit rings, and live-context status.
@@ -62,6 +66,10 @@ Tasks:
 - Verify local MongoDB seeded users contain `password` and no longer contain `passwordHash`.
 - Add demo API mutations for creating projects, knowledge items, and document metadata.
 - Wire project, knowledge, and document creation controls to the demo API.
+- Connect real authenticated frontend workspaces to production `auth/me`, `projects`, `knowledge-items`, and `activity` APIs.
+- Fix current-user authorization after registration/login so protected API routes accept fresh access tokens.
+- Wire project and knowledge creation controls to production APIs for non-demo accounts while preserving demo mode for `@novera.test`.
+- Make signup copy and CTA adapt between real workspace creation and demo workspace creation.
 
 Acceptance criteria:
 
@@ -83,6 +91,10 @@ Acceptance criteria:
 - Frontend routes for landing, login, signup, and app workspace.
 - Password visibility toggle on login and signup fields.
 - Real auth foundation with MongoDB-backed users, organizations, owner memberships, sessions, scrypt password hashing, access tokens, refresh-token rotation, logout, and current-user lookup.
+- Protected organization membership endpoints.
+- Protected project API with tenant membership validation, role checks, DTO validation, response mapping, and soft archive.
+- Protected knowledge item API with tenant membership validation, optional project validation, DTO validation, response mapping, and soft archive.
+- Activity API and activity recording for project and knowledge changes.
 - Interactive product demo with Acme Studio sample data.
 - Profile page and logout flow.
 - Working language selector for main application labels.
@@ -96,13 +108,19 @@ Acceptance criteria:
 - Demo project creation API: `POST /api/v1/demo/projects`.
 - Demo knowledge creation API: `POST /api/v1/demo/knowledge-items`.
 - Demo document metadata API: `POST /api/v1/demo/documents`.
+- Real authenticated workspaces now load their own organization, projects, knowledge items, and activity from production APIs.
+- Real project creation from the app shell persists through `POST /api/v1/projects`.
+- Real knowledge creation from the app shell persists through `POST /api/v1/knowledge-items`.
+- Freshly registered real users no longer fall back to the Acme Studio demo workspace after signup.
+- Signup now distinguishes real workspace creation from demo workspace creation in its visible CTA and translated copy.
 
 ## Still To Do Next
 
 - Replace temporary token helper with a standard audited JWT library before production hardening.
 - Add email verification and password reset flows.
-- Add tenant membership guards.
-- Replace demo API endpoints with production auth and tenant-checked endpoints.
+- Add invitation, organization switching, and organization settings write flows.
+- Replace remaining demo-only document/profile/settings flows with production auth and tenant-checked endpoints.
+- Add ownership/resource-level permission rules beyond basic role membership.
 - Connect all dashboard data to production API modules instead of demo endpoints.
 - Replace localStorage profile updates with API-backed user profile updates.
 - Translate seeded demo business records or add localized demo datasets if the product demo needs fully localized sample content.
@@ -112,14 +130,13 @@ Acceptance criteria:
 
 ## Recommended Next Sprint
 
-Implement real authentication and organization creation:
+Implement the production documents slice:
 
-- User schema and repository.
-- Password hashing.
-- Register/login DTOs and response models.
-- JWT access tokens.
-- Refresh sessions with rotation.
-- Organization schema.
-- Owner membership creation.
-- Tenant membership guard.
-- Auth and organization integration tests.
+- Document schema and DTOs.
+- Authenticated document metadata endpoints.
+- Local file upload validation for PDF, DOCX, TXT, and Markdown.
+- Object-storage abstraction with local MinIO support.
+- Background document-processing job skeleton.
+- Text extraction placeholders with explicit processing status.
+- Connect the Documents page to production endpoints for real accounts.
+- Add integration tests for tenant isolation and file validation.

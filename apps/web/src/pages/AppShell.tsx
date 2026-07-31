@@ -29,6 +29,12 @@ import {
   ApiUser,
   WorkspaceData,
 } from '../api/demoApi';
+import {
+  createProductionKnowledgeItem,
+  createProductionProject,
+  fetchProductionWorkspace,
+  hasProductionSession,
+} from '../api/productionApi';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
@@ -90,13 +96,19 @@ export function AppShell() {
   useEffect(() => {
     let isMounted = true;
     setIsLoadingWorkspace(true);
-    fetchWorkspace()
+    const workspaceRequest = hasProductionSession() ? fetchProductionWorkspace() : fetchWorkspace();
+    workspaceRequest
       .then((data) => {
         if (isMounted) {
           setWorkspace(data);
           if (data.source === 'fallback') {
             showNotice(t('usingLocalDemoData'));
           }
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          showNotice(t('workspaceLoadFailed'));
         }
       })
       .finally(() => {
@@ -169,6 +181,28 @@ export function AppShell() {
     setCurrentUser(updated);
     window.localStorage.setItem('novera-demo-user', JSON.stringify(updated));
     showNotice(workspaceData.source === 'api' ? t('profileUpdatedMongo') : t('profileUpdatedLocal'));
+  }
+
+  async function createProject(input: { name: string; owner: string; summary: string }) {
+    try {
+      const data = hasProductionSession()
+        ? await createProductionProject(input)
+        : await createDemoProject(input);
+      replaceWorkspace(data, t('projectCreated'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function createKnowledge(input: { title: string; type: string; summary: string }) {
+    try {
+      const data = hasProductionSession()
+        ? await createProductionKnowledgeItem(input)
+        : await createDemoKnowledgeItem(input);
+      replaceWorkspace(data, t('knowledgeItemCreated'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
   }
 
   return (
@@ -270,13 +304,13 @@ export function AppShell() {
             <ProjectsView
               data={workspaceData}
               onAsk={askAssistant}
-              onCreateProject={(data) => replaceWorkspace(data, t('projectCreated'))}
+              onCreateProject={createProject}
               t={t}
             />
           ) : activeView === 'Knowledge' ? (
             <KnowledgeView
               items={filteredKnowledge}
-              onCreateKnowledge={(data) => replaceWorkspace(data, t('knowledgeItemCreated'))}
+              onCreateKnowledge={createKnowledge}
               query={query}
               setQuery={setQuery}
               t={t}
@@ -451,7 +485,7 @@ function ProjectsView({
 }: {
   data: WorkspaceData;
   onAsk: (question: string) => void;
-  onCreateProject: (data: WorkspaceData) => void;
+  onCreateProject: (input: { name: string; owner: string; summary: string }) => Promise<void>;
   t: (key: TranslationKey) => string;
 }) {
   const [name, setName] = useState('New client launch');
@@ -460,7 +494,7 @@ function ProjectsView({
 
   async function submitProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onCreateProject(await createDemoProject({ name, owner, summary }));
+    await onCreateProject({ name, owner, summary });
   }
 
   return (
@@ -525,7 +559,7 @@ function KnowledgeView({
   t,
 }: {
   items: typeof knowledgeItems;
-  onCreateKnowledge: (data: WorkspaceData) => void;
+  onCreateKnowledge: (input: { title: string; type: string; summary: string }) => Promise<void>;
   query: string;
   setQuery: (query: string) => void;
   t: (key: TranslationKey) => string;
@@ -534,12 +568,12 @@ function KnowledgeView({
 
   async function submitKnowledge(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onCreateKnowledge(
-      await createDemoKnowledgeItem({
+    await onCreateKnowledge(
+      {
         title,
         type: 'decision',
         summary: 'A new decision was captured from the workspace.',
-      }),
+      },
     );
   }
 
