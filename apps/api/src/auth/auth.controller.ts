@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Patch, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './auth.dto';
+import { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from './auth.dto';
 import { AuthService } from './auth.service';
 
 @ApiTags('auth')
@@ -42,5 +42,11 @@ export class AuthController {
   @ApiOkResponse({ description: 'Returns the authenticated user and active organization.' })
   me(@Headers('authorization') authorization?: string) {
     return this.authService.me(authorization);
+  }
+
+  @Patch('me')
+  @ApiOkResponse({ description: 'Updates the authenticated user profile.' })
+  updateMe(@Headers('authorization') authorization: string | undefined, @Body() body: UpdateProfileDto) {
+    return this.authService.updateProfile(authorization, body);
   }
 }

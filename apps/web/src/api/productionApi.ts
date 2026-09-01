@@ -1,4 +1,4 @@
-import { demoUsers, documents, risks } from '../data/demoWorkspace';
+import { demoUsers, risks } from '../data/demoWorkspace';
 import { authenticatedFetch, getStoredAuth } from './authApi';
 import { WorkspaceData } from './demoApi';
 
@@ -10,6 +10,10 @@ type ApiOrganization = {
   id: string;
   name: string;
   slug: string;
+  industry?: string;
+  settings?: {
+    aiProvider?: string;
+  };
 };
 
 type ApiProject = {
@@ -43,16 +47,26 @@ type ApiActivity = {
   createdAt: string | null;
 };
 
+type ApiDocument = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  projectId: string | null;
+  updatedAt: string | null;
+};
+
 export function hasProductionSession() {
   const auth = getStoredAuth();
   return Boolean(auth && !auth.user.email.endsWith('@novera.test'));
 }
 
 export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
-  const [me, projects, knowledgeItems, activityEvents] = await Promise.all([
+  const [me, projects, knowledgeItems, documents, activityEvents] = await Promise.all([
     get<ApiResponse<{ organization: ApiOrganization }>>('/api/v1/auth/me'),
     get<ApiResponse<ApiProject[]>>('/api/v1/projects'),
     get<ApiResponse<ApiKnowledgeItem[]>>('/api/v1/knowledge-items'),
+    get<ApiResponse<ApiDocument[]>>('/api/v1/documents'),
     get<ApiResponse<ApiActivity[]>>('/api/v1/activity'),
   ]);
   const auth = getStoredAuth();
@@ -63,7 +77,7 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       id: me.data.organization.id,
       name: me.data.organization.name,
       slug: me.data.organization.slug,
-      industry: 'Knowledge business',
+      industry: me.data.organization.industry ?? 'Knowledge business',
     },
     users: auth?.user ? [auth.user] : demoUsers.slice(0, 1),
     projects: projects.data.map((project) => ({
@@ -85,7 +99,14 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       summary: item.aiSummary || item.content,
       project: item.projectId ? (projectNameById.get(item.projectId) ?? 'Unassigned') : 'Unassigned',
     })),
-    documents: documents.slice(0, 0),
+    documents: documents.data.map((document) => ({
+      id: document.id,
+      title: document.title,
+      type: document.type,
+      status: document.status,
+      project: document.projectId ? (projectNameById.get(document.projectId) ?? 'Unassigned') : 'Unassigned',
+      updated: document.updatedAt ? new Date(document.updatedAt).toLocaleString() : 'Recently',
+    })),
     risks: risks.slice(0, 0),
     activities: activityEvents.data.map((event) => ({
       id: event.id,
@@ -124,6 +145,36 @@ export async function createProductionKnowledgeItem(input: {
     source: 'Workspace entry',
     content: input.summary,
     tags: ['manual'],
+  });
+  return fetchProductionWorkspace();
+}
+
+export async function createProductionDocument(input: { title: string; type: string }): Promise<WorkspaceData> {
+  await mutation('/api/v1/documents', {
+    title: input.title,
+    type: input.type,
+    summary: 'Document metadata added from the workspace. File upload and extraction will be attached next.',
+  });
+  return fetchProductionWorkspace();
+}
+
+export async function updateProductionOrganization(input: {
+  organizationId: string;
+  name: string;
+  industry: string;
+  aiProvider: string;
+}): Promise<WorkspaceData> {
+  await authenticatedFetch(`/api/v1/organizations/${input.organizationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name: input.name,
+      industry: input.industry,
+      aiProvider: input.aiProvider,
+    }),
+  }).then((response) => {
+    if (!response.ok) {
+      throw new Error(`Organization update failed: ${response.status}`);
+    }
   });
   return fetchProductionWorkspace();
 }

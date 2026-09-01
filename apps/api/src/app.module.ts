@@ -6,6 +6,8 @@ import { ActivityModule } from './activity/activity.module';
 import { AuthModule } from './auth/auth.module';
 import { validateEnvironment } from './common/config/env.validation';
 import { DemoModule } from './demo/demo.module';
+import { DemoRequestsModule } from './demo-requests/demo-requests.module';
+import { DocumentsModule } from './documents/documents.module';
 import { HealthModule } from './health/health.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -30,7 +32,9 @@ import { ProjectsModule } from './projects/projects.module';
     OrganizationsModule,
     ProjectsModule,
     KnowledgeModule,
+    DocumentsModule,
     DemoModule,
+    DemoRequestsModule,
   ],
 })
 export class AppModule {}

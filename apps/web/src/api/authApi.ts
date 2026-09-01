@@ -46,6 +46,22 @@ export async function loginUser(email: string, password: string): Promise<AuthPa
   return payload.data;
 }
 
+export async function updateCurrentUser(input: { name: string }): Promise<ApiUser> {
+  const response = await authenticatedFetch('/api/v1/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(`Profile update failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<ApiUser>;
+  const auth = getStoredAuth();
+  if (auth) {
+    persistAuth({ ...auth, user: payload.data });
+  }
+  return payload.data;
+}
+
 export function persistAuth(payload: AuthPayload) {
   window.localStorage.setItem('novera-auth', JSON.stringify(payload));
   window.localStorage.setItem('novera-demo-user', JSON.stringify(payload.user));

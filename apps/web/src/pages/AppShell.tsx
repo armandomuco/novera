@@ -19,21 +19,21 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clearAuth } from '../api/authApi';
+import { clearAuth, updateCurrentUser } from '../api/authApi';
 import {
-  createDemoDocument,
   createDemoKnowledgeItem,
   createDemoProject,
   fetchWorkspace,
-  updateDemoProfile,
   ApiUser,
   WorkspaceData,
 } from '../api/demoApi';
 import {
   createProductionKnowledgeItem,
+  createProductionDocument,
   createProductionProject,
   fetchProductionWorkspace,
   hasProductionSession,
+  updateProductionOrganization,
 } from '../api/productionApi';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
 import { LanguageSelector } from '../components/LanguageSelector';
@@ -95,6 +95,13 @@ export function AppShell() {
 
   useEffect(() => {
     let isMounted = true;
+    if (!hasProductionSession()) {
+      window.localStorage.removeItem('novera-demo-user');
+      navigate('/login');
+      return () => {
+        isMounted = false;
+      };
+    }
     setIsLoadingWorkspace(true);
     const workspaceRequest = hasProductionSession() ? fetchProductionWorkspace() : fetchWorkspace();
     workspaceRequest
@@ -120,10 +127,10 @@ export function AppShell() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [navigate]);
 
   const workspaceData = workspace ?? {
-    organization: { name: 'Acme Studio', slug: 'acme-studio', industry: 'Digital agency' },
+    organization: { id: undefined, name: 'Acme Studio', slug: 'acme-studio', industry: 'Digital agency' },
     users: demoUsers,
     projects,
     knowledgeItems,
@@ -158,7 +165,7 @@ export function AppShell() {
 
   function askAssistant(question: string) {
     setAssistantQuestion(question);
-    setAssistantAnswer(t('assistantDemoAnswer'));
+    setAssistantAnswer(generateWorkspaceAnswer(question, workspaceData, t));
     setActiveView('Assistant');
   }
 
@@ -168,19 +175,16 @@ export function AppShell() {
     navigate('/login');
   }
 
-  async function saveProfile(name: string, email: string) {
-    if (!email.endsWith('@novera.test')) {
-      const updated = { ...currentUser, name, email };
+  async function saveProfile(name: string) {
+    try {
+      const saved = await updateCurrentUser({ name });
+      const updated = { ...currentUser, ...saved, focus: currentUser.focus };
       setCurrentUser(updated);
       window.localStorage.setItem('novera-demo-user', JSON.stringify(updated));
-      showNotice(t('profileUpdatedLocal'));
-      return;
+      showNotice(t('profileUpdatedMongo'));
+    } catch {
+      showNotice(t('saveFailed'));
     }
-    const saved = await updateDemoProfile(email, name);
-    const updated = { ...currentUser, ...saved, focus: currentUser.focus };
-    setCurrentUser(updated);
-    window.localStorage.setItem('novera-demo-user', JSON.stringify(updated));
-    showNotice(workspaceData.source === 'api' ? t('profileUpdatedMongo') : t('profileUpdatedLocal'));
   }
 
   async function createProject(input: { name: string; owner: string; summary: string }) {
@@ -205,10 +209,37 @@ export function AppShell() {
     }
   }
 
+  async function createDocument(input: { title: string; type: string }) {
+    try {
+      const data = await createProductionDocument(input);
+      replaceWorkspace(data, t('documentMetadataCreated'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function saveOrganizationSettings(input: { name: string; industry: string; aiProvider: string }) {
+    if (!workspaceData.organization.id) {
+      showNotice(t('saveFailed'));
+      return;
+    }
+    try {
+      const data = await updateProductionOrganization({
+        organizationId: workspaceData.organization.id,
+        ...input,
+      });
+      replaceWorkspace(data, t('settingsSaved'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-ink">
-      <aside className="fixed inset-y-0 hidden w-64 border-r border-line bg-white px-4 py-5 lg:block">
-        <Logo />
+    <div className="min-h-screen bg-[#F3F6F8] text-ink">
+      <aside className="fixed inset-y-0 hidden w-64 border-r border-slate-800/70 bg-navy px-4 py-5 text-white shadow-2xl lg:block">
+        <div className="[&_*]:text-white">
+          <Logo />
+        </div>
         <nav className="mt-8 space-y-1" aria-label="Main navigation">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -218,8 +249,8 @@ export function AppShell() {
                 key={item.view}
                 className={`flex h-10 w-full items-center gap-3 rounded-ui px-3 text-left text-sm font-medium transition ${
                   isActive
-                    ? 'bg-teal text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
+                    ? 'bg-white text-navy shadow-sm'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
                 type="button"
                 onClick={() => setActiveView(item.view)}
@@ -230,13 +261,13 @@ export function AppShell() {
             );
           })}
         </nav>
-        <div className="absolute bottom-5 left-4 right-4 rounded-ui border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase text-slate-500">{t('signedInAs')}</p>
-          <p className="mt-1 text-sm font-bold text-ink">{currentUser.name}</p>
-          <p className="text-xs text-slate-500">{currentUser.role}</p>
+        <div className="absolute bottom-5 left-4 right-4 rounded-ui border border-white/10 bg-white/8 p-3 backdrop-blur">
+          <p className="text-xs font-semibold uppercase text-slate-400">{t('signedInAs')}</p>
+          <p className="mt-1 text-sm font-bold text-white">{currentUser.name}</p>
+          <p className="text-xs text-slate-300">{currentUser.role}</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-ui border border-line bg-white text-xs font-semibold text-slate-700"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-ui border border-white/15 bg-white/10 text-xs font-semibold text-white"
               type="button"
               onClick={() => setActiveView('Profile')}
             >
@@ -244,7 +275,7 @@ export function AppShell() {
               {t('profile')}
             </button>
             <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-ui bg-ink text-xs font-semibold text-white"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-ui bg-white text-xs font-semibold text-navy"
               type="button"
               onClick={logout}
             >
@@ -256,7 +287,7 @@ export function AppShell() {
       </aside>
 
       <main className="lg:pl-64">
-        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-6 py-3">
+        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line bg-white/88 px-6 py-3 shadow-sm backdrop-blur">
           <div>
             <p className="text-sm text-slate-500">{workspaceData.organization.name}</p>
             <h1 className="text-xl font-bold tracking-normal">
@@ -268,7 +299,7 @@ export function AppShell() {
           <div className="flex items-center gap-3">
             <LanguageSelector value={language} onChange={changeLanguage} />
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-ui bg-ink px-4 text-sm font-semibold text-white"
+              className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
               type="button"
               onClick={() => askAssistant('What should management focus on this week?')}
             >
@@ -279,14 +310,14 @@ export function AppShell() {
         </header>
 
         {notice ? (
-          <div className="mx-6 mt-4 rounded-ui border border-teal/30 bg-teal/10 px-4 py-3 text-sm font-semibold text-teal">
+          <div className="mx-6 mt-4 rounded-ui border border-teal/30 bg-white px-4 py-3 text-sm font-semibold text-teal shadow-sm">
             {notice}
           </div>
         ) : null}
 
         <section className="p-6">
           {isLoadingWorkspace ? (
-            <div className="mb-4 rounded-ui border border-line bg-white p-4 text-sm font-semibold text-slate-600">
+            <div className="surface-panel mb-4 rounded-ui p-4 text-sm font-semibold text-slate-600">
               {t('loadingWorkspace')}
             </div>
           ) : null}
@@ -295,6 +326,7 @@ export function AppShell() {
           ) : activeView === 'Assistant' ? (
             <AssistantView
               answer={assistantAnswer}
+              data={workspaceData}
               onAsk={askAssistant}
               question={assistantQuestion}
               setQuestion={setAssistantQuestion}
@@ -318,7 +350,7 @@ export function AppShell() {
           ) : activeView === 'Documents' ? (
             <DocumentsView
               data={workspaceData}
-              onCreateDocument={(data) => replaceWorkspace(data, t('documentMetadataCreated'))}
+              onCreateDocument={createDocument}
               showNotice={showNotice}
               t={t}
             />
@@ -331,7 +363,7 @@ export function AppShell() {
           ) : activeView === 'Profile' ? (
             <ProfileView currentUser={currentUser} onSave={saveProfile} t={t} />
           ) : (
-            <SettingsView showNotice={showNotice} t={t} />
+            <SettingsView data={workspaceData} onSave={saveOrganizationSettings} t={t} />
           )}
         </section>
       </main>
@@ -348,6 +380,8 @@ function DashboardView({
   onAsk: (question: string) => void;
   t: (key: TranslationKey) => string;
 }) {
+  const hasWorkspaceSignal = data.projects.length + data.knowledgeItems.length + data.documents.length > 0;
+
   return (
     <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
       <div className="space-y-5">
@@ -358,22 +392,63 @@ function DashboardView({
             [t('recentDecisions'), String(data.knowledgeItems.filter((item) => item.type === 'Decision').length), CheckCircle2],
             [t('documents'), String(data.documents.length), FileText],
           ].map(([label, value, Icon]) => (
-            <div key={label as string} className="rounded-ui border border-line bg-white p-4 shadow-sm">
-              <Icon className="text-teal" size={20} aria-hidden="true" />
+            <div key={label as string} className="surface-panel rounded-ui p-4 transition hover:-translate-y-0.5">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-ui bg-teal/10">
+                <Icon className="text-teal" size={20} aria-hidden="true" />
+              </span>
               <p className="mt-3 text-2xl font-bold">{value as string}</p>
               <p className="text-sm text-slate-500">{label as string}</p>
             </div>
           ))}
         </div>
 
-        <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+        {!hasWorkspaceSignal ? (
+          <div className="surface-panel overflow-hidden rounded-ui p-5">
+            <div className="grid gap-5 lg:grid-cols-[1fr_0.8fr]">
+              <div>
+                <p className="text-sm font-semibold text-teal">{t('emptyWorkspaceEyebrow')}</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-normal">{t('emptyWorkspaceTitle')}</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{t('emptyWorkspaceBody')}</p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
+                    type="button"
+                    onClick={() => onAsk('What information should we add first to build this company twin?')}
+                  >
+                    <Sparkles size={16} aria-hidden="true" />
+                    {t('planFirstWorkspace')}
+                  </button>
+                  <button
+                    className="secondary-action inline-flex h-10 items-center rounded-ui px-4 text-sm font-semibold"
+                    type="button"
+                    onClick={() => onAsk('What should management focus on this week with no workspace data yet?')}
+                  >
+                    {t('askReadinessQuestion')}
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-3">
+                {['emptyStepProject', 'emptyStepKnowledge', 'emptyStepDocument'].map((step, index) => (
+                  <div key={step} className="quiet-panel flex gap-3 rounded-ui p-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ui bg-teal/10 text-sm font-bold text-teal">
+                      {index + 1}
+                    </span>
+                    <p className="text-sm font-semibold leading-6 text-slate-700">{t(step)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="surface-panel rounded-ui p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-teal">{t('managementPriorities')}</p>
               <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('thisWeek')}</h2>
             </div>
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-ui bg-teal px-4 text-sm font-semibold text-white"
+              className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
               type="button"
               onClick={() => onAsk('What should management focus on this week?')}
             >
@@ -384,7 +459,7 @@ function DashboardView({
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {['priorityAtlasCredentials', 'priorityRetainerScope', 'priorityFinancePermissions'].map(
               (priority) => (
-                <div key={priority} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
+                <div key={priority} className="quiet-panel rounded-ui p-4">
                   <p className="text-sm font-semibold text-slate-800">{t(priority)}</p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     {t('linkedToActivity')}
@@ -414,12 +489,14 @@ function DashboardView({
 
 function AssistantView({
   answer,
+  data,
   onAsk,
   question,
   setQuestion,
   t,
 }: {
   answer: string;
+  data: WorkspaceData;
   onAsk: (question: string) => void;
   question: string;
   setQuestion: (question: string) => void;
@@ -427,15 +504,15 @@ function AssistantView({
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-      <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+      <div className="surface-panel rounded-ui p-5">
         <h2 className="text-lg font-bold tracking-normal">{t('askBusinessMemory')}</h2>
         <textarea
-          className="mt-4 min-h-32 w-full rounded-ui border border-line p-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          className="mt-4 min-h-32 w-full field-frame rounded-ui p-3 text-sm outline-none"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
         />
         <button
-          className="mt-3 inline-flex h-10 items-center gap-2 rounded-ui bg-teal px-4 text-sm font-semibold text-white"
+          className="primary-action mt-3 inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
           type="button"
           onClick={() => onAsk(question)}
         >
@@ -446,7 +523,7 @@ function AssistantView({
           {assistantQuestions.map((sample) => (
             <button
               key={sample}
-              className="rounded-ui border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-teal hover:bg-white"
+              className="quiet-panel rounded-ui px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-teal/40 hover:bg-white"
               type="button"
               onClick={() => onAsk(sample)}
             >
@@ -456,14 +533,14 @@ function AssistantView({
         </div>
       </div>
 
-      <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+      <div className="surface-panel rounded-ui p-5">
         <p className="text-sm font-semibold text-teal">{t('answer')}</p>
         <p className="mt-3 text-base leading-7 text-slate-700">
           {answer || t('assistantEmpty')}
         </p>
         <div className="mt-5 grid gap-3">
-          {knowledgeItems.slice(0, 3).map((source) => (
-            <div key={source.title} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
+          {data.knowledgeItems.slice(0, 3).map((source) => (
+            <div key={source.title} className="quiet-panel rounded-ui p-4">
               <p className="text-sm font-bold text-slate-800">{source.title}</p>
               <p className="mt-1 text-sm text-slate-600">{source.source}</p>
             </div>
@@ -475,6 +552,63 @@ function AssistantView({
       </div>
     </div>
   );
+}
+
+function generateWorkspaceAnswer(
+  question: string,
+  data: WorkspaceData,
+  t: (key: TranslationKey) => string,
+) {
+  const normalized = question.toLowerCase();
+  const delayedProject = data.projects.find((project) =>
+    [project.name, project.status, project.summary].join(' ').toLowerCase().includes('delayed'),
+  );
+  const matchedProject = data.projects.find((project) =>
+    normalized.includes(project.name.toLowerCase()),
+  ) ?? delayedProject;
+  const relatedKnowledge = data.knowledgeItems.filter((item) =>
+    matchedProject ? item.project === matchedProject.name : normalized.includes(item.type.toLowerCase()),
+  );
+  const recentActivity = data.activities.slice(0, 3);
+
+  if (!data.projects.length && !data.knowledgeItems.length && !data.documents.length) {
+    return t('assistantNoInformation');
+  }
+
+  if (normalized.includes('delayed') || normalized.includes('delay') || normalized.includes('why')) {
+    if (!matchedProject) {
+      return t('assistantNoInformation');
+    }
+    return [
+      `${matchedProject.name}: ${matchedProject.summary || t('assistantLimitedProjectContext')}`,
+      `${t('status')}: ${matchedProject.status}. ${t('risk')}: ${matchedProject.risk}. ${t('owner')}: ${matchedProject.owner}.`,
+      relatedKnowledge.length
+        ? `${t('supportingSources')}: ${relatedKnowledge.map((item) => item.title).join(', ')}.`
+        : t('assistantLimitedSources'),
+    ].join(' ');
+  }
+
+  if (normalized.includes('decision')) {
+    const decisions = data.knowledgeItems.filter((item) => item.type.toLowerCase().includes('decision'));
+    if (!decisions.length) {
+      return t('assistantNoInformation');
+    }
+    return `${t('recentDecisions')}: ${decisions.map((item) => `${item.title} (${item.project})`).join('; ')}. ${t('assistantGroundingNote')}`;
+  }
+
+  if (normalized.includes('risk') || normalized.includes('focus') || normalized.includes('week')) {
+    const riskSummary = data.risks.length
+      ? data.risks.map((risk) => `${risk.title}: ${risk.mitigation}`).join('; ')
+      : t('assistantNoRisksRecorded');
+    const projectSummary = data.projects.slice(0, 3).map((project) => `${project.name} (${project.status})`).join(', ');
+    return `${t('managementFocus')}: ${projectSummary || t('assistantNoProjectsRecorded')}. ${riskSummary}. ${t('assistantGroundingNote')}`;
+  }
+
+  if (recentActivity.length) {
+    return `${t('activityTimeline')}: ${recentActivity.map((event) => `${event.actor} ${event.action} ${event.target}`).join('; ')}. ${t('assistantGroundingNote')}`;
+  }
+
+  return t('assistantNoInformation');
 }
 
 function ProjectsView({
@@ -499,33 +633,33 @@ function ProjectsView({
 
   return (
     <div className="space-y-5">
-      <form className="rounded-ui border border-line bg-white p-5 shadow-sm" onSubmit={submitProject}>
+      <form className="surface-panel rounded-ui p-5" onSubmit={submitProject}>
         <h2 className="text-lg font-bold tracking-normal">{t('createProject')}</h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_1.2fr_auto]">
           <input
-            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
           <input
-            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
             value={owner}
             onChange={(event) => setOwner(event.target.value)}
           />
           <input
-            className="h-10 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
           />
-          <button className="h-10 rounded-ui bg-teal px-4 text-sm font-semibold text-white" type="submit">
+          <button className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white" type="submit">
             {t('create')}
           </button>
         </div>
       </form>
       <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       <div className="grid gap-4 lg:grid-cols-3">
-        {data.projects.map((project) => (
-          <div key={project.name} className="rounded-ui border border-line bg-white p-5 shadow-sm">
+        {data.projects.length ? data.projects.map((project) => (
+          <div key={project.name} className="surface-panel rounded-ui p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
@@ -545,7 +679,9 @@ function ProjectsView({
               {project.progress}% {t('complete')}
             </p>
           </div>
-        ))}
+        )) : (
+          <EmptyState title={t('noProjectsTitle')} body={t('noProjectsBody')} />
+        )}
       </div>
     </div>
   );
@@ -578,13 +714,13 @@ function KnowledgeView({
   }
 
   return (
-    <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-ui p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-teal">{t('knowledgeExplorer')}</p>
           <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('searchCompanyMemory')}</h2>
         </div>
-        <label className="flex h-10 min-w-72 items-center gap-2 rounded-ui border border-line px-3">
+        <label className="field-frame flex h-10 min-w-72 items-center gap-2 rounded-ui px-3">
           <Search size={17} className="text-slate-400" aria-hidden="true" />
           <input
             className="w-full border-0 bg-transparent text-sm outline-none"
@@ -596,17 +732,17 @@ function KnowledgeView({
       </div>
       <form className="mt-5 flex flex-wrap gap-3" onSubmit={submitKnowledge}>
         <input
-          className="h-10 min-w-72 rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          className="h-10 min-w-72 field-frame rounded-ui px-3 text-sm outline-none"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-        <button className="h-10 rounded-ui bg-teal px-4 text-sm font-semibold text-white" type="submit">
+        <button className="h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
           {t('addKnowledge')}
         </button>
       </form>
       <div className="mt-5 grid gap-3">
-        {items.map((item) => (
-          <div key={item.title} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
+        {items.length ? items.map((item) => (
+          <div key={item.title} className="quiet-panel rounded-ui p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">
                 {item.type}
@@ -616,7 +752,9 @@ function KnowledgeView({
             <h3 className="mt-3 text-base font-bold tracking-normal">{item.title}</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">{item.summary}</p>
           </div>
-        ))}
+        )) : (
+          <EmptyState title={t('noKnowledgeTitle')} body={t('noKnowledgeBody')} />
+        )}
       </div>
     </div>
   );
@@ -629,7 +767,7 @@ function DocumentsView({
   t,
 }: {
   data: WorkspaceData;
-  onCreateDocument: (data: WorkspaceData) => void;
+  onCreateDocument: (input: { title: string; type: string }) => Promise<void>;
   showNotice: (message: string) => void;
   t: (key: TranslationKey) => string;
 }) {
@@ -638,14 +776,14 @@ function DocumentsView({
 
   async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onCreateDocument(await createDemoDocument({ title, type }));
+    await onCreateDocument({ title, type });
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_0.45fr]">
-      <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+      <div className="surface-panel rounded-ui p-5">
         <h2 className="text-2xl font-bold tracking-normal">{t('documents')}</h2>
-        <div className="mt-5 overflow-hidden rounded-ui border border-slate-200">
+        <div className="table-surface mt-5 overflow-hidden rounded-ui">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
@@ -667,20 +805,25 @@ function DocumentsView({
             </tbody>
           </table>
         </div>
+        {!data.documents.length ? (
+          <div className="mt-4">
+            <EmptyState title={t('noDocumentsTitle')} body={t('noDocumentsBody')} />
+          </div>
+        ) : null}
       </div>
-      <form className="rounded-ui border border-line bg-white p-5 shadow-sm" onSubmit={submitDocument}>
+      <form className="surface-panel rounded-ui p-5" onSubmit={submitDocument}>
         <Upload className="text-teal" size={24} aria-hidden="true" />
         <h3 className="mt-4 text-lg font-bold tracking-normal">{t('uploadDocument')}</h3>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {t('documentUploadHelp')}
         </p>
         <input
-          className="mt-4 h-10 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          className="mt-4 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
         <select
-          className="mt-3 h-10 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+          className="mt-3 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
           value={type}
           onChange={(event) => setType(event.target.value)}
         >
@@ -689,11 +832,11 @@ function DocumentsView({
           <option>Markdown</option>
           <option>TXT</option>
         </select>
-        <button className="mt-4 h-10 rounded-ui bg-ink px-4 text-sm font-semibold text-white" type="submit">
+        <button className="mt-4 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
           {t('addDocument')}
         </button>
         <button
-          className="ml-2 mt-4 h-10 rounded-ui border border-line px-4 text-sm font-semibold text-slate-700"
+          className="secondary-action ml-2 mt-4 h-10 rounded-ui px-4 text-sm font-semibold"
           type="button"
           onClick={() => showNotice(t('fileUploadLater'))}
         >
@@ -715,14 +858,14 @@ function IntegrationsView({
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {integrations.map((integration) => (
-        <div key={integration} className="rounded-ui border border-line bg-white p-5 shadow-sm">
+        <div key={integration} className="surface-panel rounded-ui p-5">
           <Plug className="text-signal" size={22} aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold tracking-normal">{integration}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {t('integrationPrepared')}
           </p>
           <button
-            className="mt-4 h-9 rounded-ui border border-line px-3 text-sm font-semibold text-slate-700"
+            className="secondary-action mt-4 h-9 rounded-ui px-3 text-sm font-semibold"
             type="button"
             onClick={() => showNotice(`${integration} ${t('integrationLater')}`)}
           >
@@ -736,13 +879,13 @@ function IntegrationsView({
 
 function TeamView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) => string }) {
   return (
-    <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-ui p-5">
       <h2 className="text-2xl font-bold tracking-normal">{t('teamPermissions')}</h2>
       <div className="mt-5 grid gap-3">
-        {data.users.map((user) => (
+        {data.users.length ? data.users.map((user) => (
           <div
             key={user.email}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-ui border border-slate-200 bg-slate-50 p-4"
+            className="flex flex-wrap items-center justify-between gap-3 quiet-panel rounded-ui p-4"
           >
             <div>
               <p className="font-bold text-slate-800">{user.name}</p>
@@ -753,7 +896,9 @@ function TeamView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) =
               <LockKeyhole size={18} className="text-slate-400" aria-hidden="true" />
             </div>
           </div>
-        ))}
+        )) : (
+          <EmptyState title={t('noTeamTitle')} body={t('noTeamBody')} />
+        )}
       </div>
     </div>
   );
@@ -761,18 +906,20 @@ function TeamView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) =
 
 function ActivityView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) => string }) {
   return (
-    <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-ui p-5">
       <h2 className="text-2xl font-bold tracking-normal">{t('activityTimeline')}</h2>
       <div className="mt-5 grid gap-3">
-        {data.activities.map((item) => (
-          <div key={`${item.actor}-${item.target}`} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
+        {data.activities.length ? data.activities.map((item) => (
+          <div key={`${item.actor}-${item.target}`} className="quiet-panel rounded-ui p-4">
             <p className="text-sm font-semibold text-slate-800">
               {item.actor} {item.action}
             </p>
             <p className="mt-1 text-sm text-slate-600">{item.target}</p>
             <p className="mt-2 text-xs font-semibold text-slate-500">{item.time}</p>
           </div>
-        ))}
+        )) : (
+          <EmptyState title={t('noActivityTitle')} body={t('noActivityBody')} />
+        )}
       </div>
     </div>
   );
@@ -784,15 +931,14 @@ function ProfileView({
   t,
 }: {
   currentUser: ApiUser;
-  onSave: (name: string, email: string) => void;
+  onSave: (name: string) => void;
   t: (key: TranslationKey) => string;
 }) {
   const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[0.7fr_1.3fr]">
-      <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+      <div className="surface-panel rounded-ui p-5">
         <UserCircle className="text-teal" size={42} aria-hidden="true" />
         <h2 className="mt-4 text-2xl font-bold tracking-normal">{currentUser.name}</h2>
         <p className="mt-1 text-sm text-slate-500">{currentUser.email}</p>
@@ -800,17 +946,17 @@ function ProfileView({
         <p className="mt-4 text-sm leading-6 text-slate-600">{currentUser.focus}</p>
       </div>
       <form
-        className="rounded-ui border border-line bg-white p-5 shadow-sm"
+        className="surface-panel rounded-ui p-5"
         onSubmit={(event) => {
           event.preventDefault();
-          onSave(name, email);
+          onSave(name);
         }}
       >
         <h2 className="text-2xl font-bold tracking-normal">{t('profile')}</h2>
         <label className="mt-5 block">
           <span className="text-sm font-semibold text-slate-700">{t('name')}</span>
           <input
-            className="mt-2 h-11 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -818,13 +964,14 @@ function ProfileView({
         <label className="mt-4 block">
           <span className="text-sm font-semibold text-slate-700">{t('email')}</span>
           <input
-            className="mt-2 h-11 w-full rounded-ui border border-line px-3 text-sm outline-none focus:ring-2 focus:ring-signal"
+            className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
             type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={currentUser.email}
+            readOnly
           />
+          <span className="mt-2 block text-xs font-medium text-slate-500">{t('emailChangeLater')}</span>
         </label>
-        <button className="mt-5 h-10 rounded-ui bg-teal px-4 text-sm font-semibold text-white" type="submit">
+        <button className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
           {t('saveChanges')}
         </button>
       </form>
@@ -833,33 +980,72 @@ function ProfileView({
 }
 
 function SettingsView({
-  showNotice,
+  data,
+  onSave,
   t,
 }: {
-  showNotice: (message: string) => void;
+  data: WorkspaceData;
+  onSave: (input: { name: string; industry: string; aiProvider: string }) => Promise<void>;
   t: (key: TranslationKey) => string;
 }) {
+  const [name, setName] = useState(data.organization.name);
+  const [industry, setIndustry] = useState(data.organization.industry ?? 'Knowledge business');
+  const [aiProvider, setAiProvider] = useState('mock');
+
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
-      {[
-        [t('organization'), t('organizationSettingsBody')],
-        [t('security'), t('securitySettingsBody')],
-        [t('aiProvider'), t('aiProviderSettingsBody')],
-      ].map(([title, body]) => (
-        <div key={title} className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <form
+      className="grid gap-5 lg:grid-cols-[1fr_0.8fr]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave({ name, industry, aiProvider });
+      }}
+    >
+      <div className="surface-panel rounded-ui p-5">
+        <ShieldCheck className="text-teal" size={22} aria-hidden="true" />
+        <h2 className="mt-4 text-lg font-bold tracking-normal">{t('organization')}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t('organizationSettingsBody')}</p>
+        <label className="mt-5 block">
+          <span className="text-sm font-semibold text-slate-700">{t('organization')}</span>
+          <input
+            className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="mt-4 block">
+          <span className="text-sm font-semibold text-slate-700">{t('industry')}</span>
+          <input
+            className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            value={industry}
+            onChange={(event) => setIndustry(event.target.value)}
+          />
+        </label>
+        <button className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
+          {t('saveChanges')}
+        </button>
+      </div>
+      <div className="grid gap-5">
+        <div className="surface-panel rounded-ui p-5">
           <ShieldCheck className="text-teal" size={22} aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-bold tracking-normal">{title}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-          <button
-            className="mt-4 h-9 rounded-ui border border-line px-3 text-sm font-semibold text-slate-700"
-            type="button"
-            onClick={() => showNotice(`${title} ${t('settingsSavedLocal')}`)}
+          <h2 className="mt-4 text-lg font-bold tracking-normal">{t('aiProvider')}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t('aiProviderSettingsBody')}</p>
+          <select
+            className="mt-4 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            value={aiProvider}
+            onChange={(event) => setAiProvider(event.target.value)}
           >
-            {t('saveChanges')}
-          </button>
+            <option value="mock">Mock local assistant</option>
+            <option value="openai">OpenAI ready</option>
+            <option value="custom">Custom provider</option>
+          </select>
         </div>
-      ))}
-    </div>
+        <div className="surface-panel rounded-ui p-5">
+          <ShieldCheck className="text-teal" size={22} aria-hidden="true" />
+          <h2 className="mt-4 text-lg font-bold tracking-normal">{t('security')}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t('securitySettingsBody')}</p>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -873,9 +1059,9 @@ function ProjectTable({
   t: (key: TranslationKey) => string;
 }) {
   return (
-    <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-ui p-5">
       <h2 className="text-lg font-bold tracking-normal">{t('activeProjects')}</h2>
-      <div className="mt-4 overflow-hidden rounded-ui border border-slate-200">
+      <div className="table-surface mt-4 overflow-hidden rounded-ui">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
@@ -907,17 +1093,22 @@ function ProjectTable({
           </tbody>
         </table>
       </div>
+      {!projects.length ? (
+        <div className="mt-4">
+          <EmptyState title={t('noProjectsTitle')} body={t('noProjectsBody')} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function RiskPanel({ risks, t }: { risks: WorkspaceData['risks']; t: (key: TranslationKey) => string }) {
   return (
-    <div className="rounded-ui border border-line bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-ui p-5">
       <h2 className="text-lg font-bold tracking-normal">{t('currentRisks')}</h2>
       <div className="mt-4 grid gap-3">
-        {risks.map((risk) => (
-          <div key={risk.title} className="rounded-ui border border-slate-200 bg-slate-50 p-4">
+        {risks.length ? risks.map((risk) => (
+          <div key={risk.title} className="quiet-panel rounded-ui p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-bold text-slate-800">{risk.title}</p>
               <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
@@ -926,7 +1117,25 @@ function RiskPanel({ risks, t }: { risks: WorkspaceData['risks']; t: (key: Trans
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-600">{risk.mitigation}</p>
           </div>
-        ))}
+        )) : (
+          <EmptyState title={t('noRisksTitle')} body={t('noRisksBody')} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="quiet-panel rounded-ui p-5">
+      <div className="flex gap-3">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-ui bg-slate-100">
+          <Sparkles className="text-teal" size={18} aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-bold text-slate-800">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{body}</p>
+        </div>
       </div>
     </div>
   );

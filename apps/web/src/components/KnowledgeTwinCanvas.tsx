@@ -163,9 +163,9 @@ export function KnowledgeTwinCanvas({
   ];
 
   return (
-    <div className="relative h-80 overflow-hidden rounded-ui border border-line bg-white shadow-sm">
-      <div className="absolute inset-0 bg-[linear-gradient(#e2e8f0_1px,transparent_1px),linear-gradient(90deg,#e2e8f0_1px,transparent_1px)] bg-[size:32px_32px] opacity-35" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(20,184,166,0.16),transparent_58%)]" />
+    <div className="surface-panel relative h-80 overflow-hidden rounded-ui">
+      <div className="absolute inset-0 bg-[linear-gradient(#dbe4ee_1px,transparent_1px),linear-gradient(90deg,#dbe4ee_1px,transparent_1px)] bg-[size:32px_32px] opacity-40" />
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/80 to-transparent" />
       <div ref={containerRef} className="absolute inset-0 min-h-72" />
       {labels.map(([label, className]) => (
         <span

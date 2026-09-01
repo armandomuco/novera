@@ -3,6 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AuthOrganization, AuthOrganizationMember } from '../auth/auth.schemas';
 import { AuthContext } from '../auth/auth.types';
+import { UpdateOrganizationDto } from './organizations.dto';
+
+const organizationWriteRoles = new Set(['Owner', 'Administrator']);
 
 @Injectable()
 export class OrganizationsService {
@@ -59,7 +62,44 @@ export class OrganizationsService {
         id: organization._id.toString(),
         name: organization.name,
         slug: organization.slug,
+        industry: organization.industry ?? 'Knowledge business',
+        settings: organization.settings ?? {},
         role: auth.role,
+      },
+    };
+  }
+
+  async update(auth: AuthContext, organizationId: string, body: UpdateOrganizationDto) {
+    const membership = await this.requireMembership(auth, organizationId);
+    if (!organizationWriteRoles.has(membership.role)) {
+      throw new ForbiddenException('You do not have permission to update organization settings.');
+    }
+    const updated = await this.organizationModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(organizationId), deletedAt: null },
+        {
+          $set: {
+            ...(body.name !== undefined ? { name: body.name } : {}),
+            ...(body.industry !== undefined ? { industry: body.industry } : {}),
+            ...(body.aiProvider !== undefined ? { 'settings.aiProvider': body.aiProvider } : {}),
+            updatedBy: new Types.ObjectId(auth.userId),
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      )
+      .lean();
+    if (!updated) {
+      throw new NotFoundException('Organization not found.');
+    }
+    return {
+      data: {
+        id: updated._id.toString(),
+        name: updated.name,
+        slug: updated.slug,
+        industry: updated.industry ?? 'Knowledge business',
+        settings: updated.settings ?? {},
+        role: membership.role,
       },
     };
   }

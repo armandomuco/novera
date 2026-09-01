@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { LoginDto, RegisterDto } from './auth.dto';
+import { LoginDto, RegisterDto, UpdateProfileDto } from './auth.dto';
 import { AuthOrganization, AuthOrganizationMember, AuthSession, AuthUser } from './auth.schemas';
 import { AuthContext } from './auth.types';
 
@@ -188,6 +188,23 @@ export class AuthService {
           slug: organization.slug,
         },
       },
+    };
+  }
+
+  async updateProfile(authorization: string | undefined, body: UpdateProfileDto) {
+    const auth = await this.authenticateAccessToken(authorization);
+    const user = await this.userModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(auth.userId), deletedAt: null },
+        { $set: { name: body.name, updatedAt: new Date() } },
+        { new: true },
+      )
+      .lean();
+    if (!user) {
+      throw new UnauthorizedException('Session is no longer valid.');
+    }
+    return {
+      data: this.userResponse(user._id, user.email, user.name, auth.role),
     };
   }
 

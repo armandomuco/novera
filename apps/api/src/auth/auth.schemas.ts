@@ -34,6 +34,12 @@ export class AuthOrganization {
   @Prop({ required: true, unique: true, trim: true })
   slug!: string;
 
+  @Prop({ default: 'Knowledge business', trim: true })
+  industry?: string;
+
+  @Prop({ type: Object, default: {} })
+  settings?: Record<string, unknown>;
+
   @Prop()
   createdBy?: Types.ObjectId;
 

@@ -6,15 +6,19 @@ type PasswordFieldProps = {
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
+  autoComplete?: string;
+  placeholder?: string;
   showLabel: string;
   hideLabel: string;
 };
 
 export function PasswordField({
   label,
+  autoComplete,
   value,
   defaultValue,
   onChange,
+  placeholder,
   showLabel,
   hideLabel,
 }: PasswordFieldProps) {
@@ -24,11 +28,13 @@ export function PasswordField({
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <span className="mt-2 flex h-11 items-center gap-2 rounded-ui border border-line bg-white px-3 focus-within:ring-2 focus-within:ring-signal">
+      <span className="field-frame mt-2 flex h-11 items-center gap-2 rounded-ui px-3">
         <LockKeyhole size={18} className="text-slate-400" aria-hidden="true" />
         <input
           className="w-full border-0 bg-transparent text-sm outline-none"
+          autoComplete={autoComplete}
           defaultValue={defaultValue}
+          placeholder={placeholder}
           type={isVisible ? 'text' : 'password'}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}

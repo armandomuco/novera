@@ -37,3 +37,9 @@ export class LogoutDto {
   @IsString()
   refreshToken?: string;
 }
+
+export class UpdateProfileDto {
+  @IsString()
+  @MinLength(2)
+  name!: string;
+}

@@ -1,8 +1,9 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentAuth } from '../auth/current-auth.decorator';
 import { AuthContext } from '../auth/auth.types';
+import { UpdateOrganizationDto } from './organizations.dto';
 import { OrganizationsService } from './organizations.service';
 
 @ApiTags('organizations')
@@ -28,5 +29,16 @@ export class OrganizationsController {
   @ApiOkResponse({ description: 'Returns one organization after membership validation.' })
   getOrganization(@CurrentAuth() auth: AuthContext, @Param('organizationId') organizationId: string) {
     return this.organizationsService.getById(auth, organizationId);
+  }
+
+  @Patch(':organizationId')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ description: 'Updates organization profile and settings.' })
+  updateOrganization(
+    @CurrentAuth() auth: AuthContext,
+    @Param('organizationId') organizationId: string,
+    @Body() body: UpdateOrganizationDto,
+  ) {
+    return this.organizationsService.update(auth, organizationId, body);
   }
 }

@@ -10,7 +10,7 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
   const selected = languages.find((language) => language.code === value) ?? languages[0];
 
   return (
-    <label className="relative inline-flex h-10 min-w-40 items-center rounded-ui border border-line bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm">
+    <label className="field-frame relative inline-flex h-10 min-w-40 items-center rounded-ui px-3 text-sm font-semibold text-slate-700 shadow-sm">
       <span className="mr-2 text-base" aria-hidden="true">
         {selected.flag}
       </span>

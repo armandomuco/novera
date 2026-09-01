@@ -2,8 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppShell } from './pages/AppShell';
+import { DemoRequestPage } from './pages/DemoRequestPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
+import { PricingPage } from './pages/PricingPage';
 import { SignupPage } from './pages/SignupPage';
 import './styles/index.css';
 
@@ -19,6 +21,14 @@ const router = createBrowserRouter([
   {
     path: '/signup',
     element: <SignupPage />,
+  },
+  {
+    path: '/request-demo',
+    element: <DemoRequestPage />,
+  },
+  {
+    path: '/pricing',
+    element: <PricingPage />,
   },
   {
     path: '/app',

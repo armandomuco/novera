@@ -5,11 +5,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: '#111827',
+        ink: '#0F172A',
         teal: '#0F766E',
         signal: '#2563EB',
-        mist: '#F8FAFC',
-        line: '#CBD5E1',
+        mist: '#F5F7FA',
+        line: '#D7DEE8',
+        gold: '#B7791F',
+        navy: '#172033',
       },
       borderRadius: {
         ui: '8px',

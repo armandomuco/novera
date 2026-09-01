@@ -29,6 +29,8 @@
 | As a manager, I want to ask why a project is delayed, so that I can act faster. | Answer uses authorized sources, citations, limits, related records. | Search/docs | P0 | Very high | 5 | Planned |
 | As an owner, I want a dashboard of risks and priorities, so that I know what to focus on. | Active projects, risks, recent decisions, documents, suggested priorities. | Projects/knowledge | P0 | Medium | 6 | In progress |
 | As an administrator, I want to see integration options, so that I understand future data sources. | Mock catalog, provider states, sync architecture copy. | Foundation | P1 | Low | 6 | In progress |
+| As a buyer, I want to request a time-limited demo, so that I can evaluate Novera without public demo credentials. | Request form saves name, email, company, role, size, use case, status, and 5-day expiration window. | Foundation | P0 | Low | 6 | Done |
+| As a buyer, I want to compare plans, so that I understand expected pricing before contacting the team. | Pricing page shows Starter, Growth, and Scale plans with clear CTAs. | Foundation | P0 | Low | 6 | Done |
 
 ## Initial Sprint Plan
 
@@ -70,6 +72,16 @@ Tasks:
 - Fix current-user authorization after registration/login so protected API routes accept fresh access tokens.
 - Wire project and knowledge creation controls to production APIs for non-demo accounts while preserving demo mode for `@novera.test`.
 - Make signup copy and CTA adapt between real workspace creation and demo workspace creation.
+- Remove visible demo-account credentials from public login and signup screens.
+- Remove default values from login and signup forms and replace them with placeholders.
+- Add public demo-request page and backend request storage with a 5-day demo-expiration policy.
+- Add public pricing page with Starter, Growth, and Scale plans.
+- Require a real authenticated session before entering `/app`.
+- Replace the assistant's fixed canned answer with workspace-grounded answer generation from visible projects, knowledge, risks, and activity.
+- Add production profile update through `PATCH /api/v1/auth/me`.
+- Add production organization settings update through `PATCH /api/v1/organizations/:organizationId`.
+- Add production document metadata module with `GET /api/v1/documents` and `POST /api/v1/documents`.
+- Wire profile, settings, and document metadata controls to production APIs.
 
 Acceptance criteria:
 
@@ -113,13 +125,23 @@ Acceptance criteria:
 - Real knowledge creation from the app shell persists through `POST /api/v1/knowledge-items`.
 - Freshly registered real users no longer fall back to the Acme Studio demo workspace after signup.
 - Signup now distinguishes real workspace creation from demo workspace creation in its visible CTA and translated copy.
+- Public login and signup no longer show demo users or pre-filled demo credentials.
+- Public demo access now starts with `POST /api/v1/demo-requests`; approved demos should be created manually and expire after 5 days.
+- Pricing page added with recommended initial packaging: Starter at 99 EUR/month, Growth at 249 EUR/month, and Scale as custom.
+- App shell now redirects unauthenticated users to login instead of opening a public forever-demo workspace.
+- Assistant answers now use the current workspace data and state when there is not enough information.
+- Profile name updates now persist through the authenticated API.
+- Organization name, industry, and AI-provider preference now persist through the authenticated organization API.
+- Document metadata creation/listing now works for real authenticated workspaces and records activity events.
 
 ## Still To Do Next
 
 - Replace temporary token helper with a standard audited JWT library before production hardening.
 - Add email verification and password reset flows.
-- Add invitation, organization switching, and organization settings write flows.
-- Replace remaining demo-only document/profile/settings flows with production auth and tenant-checked endpoints.
+- Add an internal admin review screen for demo requests and manual demo workspace creation.
+- Enforce demo account expiration in authentication/session validation once demo accounts are created by the team.
+- Add invitation and organization switching flows.
+- Replace metadata-only document creation with real file upload, object storage, extraction, chunking, and malware-scanning integration point.
 - Add ownership/resource-level permission rules beyond basic role membership.
 - Connect all dashboard data to production API modules instead of demo endpoints.
 - Replace localStorage profile updates with API-backed user profile updates.
