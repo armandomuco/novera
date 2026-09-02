@@ -8,12 +8,13 @@ LOG_DIR="$ROOT_DIR/tmp/dev-logs"
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
 require_node() {
-  local major
+  local major minor
   major="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+  minor="$(node -p "process.versions.node.split('.')[1]" 2>/dev/null || echo 0)"
 
-  if (( major < 20 )); then
-    echo "Node.js 20.11+ is required. Current version: $(node -v 2>/dev/null || echo unavailable)."
-    echo "Install or switch to Node 20+, then run npm install and npm run dev:start again."
+  if ! (( (major == 20 && minor >= 19) || (major == 22 && minor >= 12) || major >= 24 )); then
+    echo "Node.js 20.19+ or 22.12+ is required. Current version: $(node -v 2>/dev/null || echo unavailable)."
+    echo "Install or switch to a supported Node version, then run npm install and npm run dev:start again."
     exit 1
   fi
 }

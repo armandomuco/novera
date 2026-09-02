@@ -11,6 +11,13 @@ const environmentSchema = z.object({
   AI_PROVIDER: z.string().min(1).default('mock'),
   AI_API_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().optional(),
+  WEB_APP_URL: z.string().url().default('http://localhost:5173'),
+  S3_ENDPOINT: z.string().url().default('http://localhost:9010'),
+  S3_REGION: z.string().min(1).default('us-east-1'),
+  S3_BUCKET: z.string().min(3).default('novera-local'),
+  S3_ACCESS_KEY: z.string().min(1).default('minio'),
+  S3_SECRET_KEY: z.string().min(1).default('minio123'),
+  DOCUMENT_MAX_SIZE_MB: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

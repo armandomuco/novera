@@ -9,11 +9,15 @@ const supportEmail = 'support@novera.example';
 
 @Injectable()
 export class DemoRequestsService {
-  constructor(@InjectModel(DemoRequest.name) private readonly demoRequestModel: Model<DemoRequest>) {}
+  constructor(
+    @InjectModel(DemoRequest.name) private readonly demoRequestModel: Model<DemoRequest>,
+  ) {}
 
   async create(body: CreateDemoRequestDto) {
     const requestedAt = new Date();
-    const requestedDemoExpiresAt = new Date(requestedAt.getTime() + demoWindowDays * 24 * 60 * 60 * 1000);
+    const requestedDemoExpiresAt = new Date(
+      requestedAt.getTime() + demoWindowDays * 24 * 60 * 60 * 1000,
+    );
     const request = await this.demoRequestModel.create({
       ...body,
       email: body.email.toLowerCase(),

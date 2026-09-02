@@ -29,6 +29,27 @@ export class Document {
   @Prop({ default: '' })
   aiSummary!: string;
 
+  @Prop({ type: String, default: null })
+  storageKey?: string | null;
+
+  @Prop({ type: String, default: null })
+  originalFileName?: string | null;
+
+  @Prop({ type: String, default: null })
+  mimeType?: string | null;
+
+  @Prop({ type: Number, default: null })
+  sizeBytes?: number | null;
+
+  @Prop({ type: String, default: null })
+  checksumSha256?: string | null;
+
+  @Prop({ type: String, default: null })
+  processingError?: string | null;
+
+  @Prop({ type: Date, default: null })
+  extractedAt?: Date | null;
+
   @Prop({ required: true })
   createdBy!: Types.ObjectId;
 

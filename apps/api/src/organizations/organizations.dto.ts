@@ -1,4 +1,21 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+
+export const assignableOrganizationRoles = [
+  'Administrator',
+  'Manager',
+  'Member',
+  'Viewer',
+] as const;
 
 export class UpdateOrganizationDto {
   @IsOptional()
@@ -17,4 +34,18 @@ export class UpdateOrganizationDto {
   @IsString()
   @MaxLength(80)
   aiProvider?: string;
+}
+
+export class CreateInvitationDto {
+  @IsEmail()
+  email!: string;
+
+  @IsIn(assignableOrganizationRoles)
+  role!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  expiresInDays?: number;
 }

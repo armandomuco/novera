@@ -56,18 +56,46 @@ type ApiDocument = {
   updatedAt: string | null;
 };
 
+type ApiMember = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+};
+
+type ApiInvitation = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+  previewUrl?: string;
+  delivery?: string;
+};
+
+type ApiOrganizationMembership = ApiOrganization & { role: string };
+
 export function hasProductionSession() {
   const auth = getStoredAuth();
   return Boolean(auth && !auth.user.email.endsWith('@novera.test'));
 }
 
 export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
-  const [me, projects, knowledgeItems, documents, activityEvents] = await Promise.all([
-    get<ApiResponse<{ organization: ApiOrganization }>>('/api/v1/auth/me'),
-    get<ApiResponse<ApiProject[]>>('/api/v1/projects'),
-    get<ApiResponse<ApiKnowledgeItem[]>>('/api/v1/knowledge-items'),
-    get<ApiResponse<ApiDocument[]>>('/api/v1/documents'),
-    get<ApiResponse<ApiActivity[]>>('/api/v1/activity'),
+  const [me, organizations, projects, knowledgeItems, documents, activityEvents] =
+    await Promise.all([
+      get<ApiResponse<{ organization: ApiOrganization }>>('/api/v1/auth/me'),
+      get<ApiResponse<ApiOrganizationMembership[]>>('/api/v1/organizations'),
+      get<ApiResponse<ApiProject[]>>('/api/v1/projects'),
+      get<ApiResponse<ApiKnowledgeItem[]>>('/api/v1/knowledge-items'),
+      get<ApiResponse<ApiDocument[]>>('/api/v1/documents'),
+      get<ApiResponse<ApiActivity[]>>('/api/v1/activity'),
+    ]);
+  const [members, invitations] = await Promise.all([
+    get<ApiResponse<ApiMember[]>>(`/api/v1/organizations/${me.data.organization.id}/members`),
+    get<ApiResponse<ApiInvitation[]>>(
+      `/api/v1/organizations/${me.data.organization.id}/invitations`,
+    ),
   ]);
   const auth = getStoredAuth();
   const projectNameById = new Map(projects.data.map((project) => [project.id, project.name]));
@@ -79,7 +107,9 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       slug: me.data.organization.slug,
       industry: me.data.organization.industry ?? 'Knowledge business',
     },
-    users: auth?.user ? [auth.user] : demoUsers.slice(0, 1),
+    organizations: organizations.data,
+    users: members.data.length ? members.data : auth?.user ? [auth.user] : demoUsers.slice(0, 1),
+    invitations: invitations.data,
     projects: projects.data.map((project) => ({
       id: project.id,
       name: project.name,
@@ -97,14 +127,18 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       title: item.title,
       source: item.source,
       summary: item.aiSummary || item.content,
-      project: item.projectId ? (projectNameById.get(item.projectId) ?? 'Unassigned') : 'Unassigned',
+      project: item.projectId
+        ? (projectNameById.get(item.projectId) ?? 'Unassigned')
+        : 'Unassigned',
     })),
     documents: documents.data.map((document) => ({
       id: document.id,
       title: document.title,
       type: document.type,
       status: document.status,
-      project: document.projectId ? (projectNameById.get(document.projectId) ?? 'Unassigned') : 'Unassigned',
+      project: document.projectId
+        ? (projectNameById.get(document.projectId) ?? 'Unassigned')
+        : 'Unassigned',
       updated: document.updatedAt ? new Date(document.updatedAt).toLocaleString() : 'Recently',
     })),
     risks: risks.slice(0, 0),
@@ -117,6 +151,40 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
     })),
     source: 'api',
   };
+}
+
+export async function createProductionInvitation(input: {
+  organizationId: string;
+  email: string;
+  role: string;
+}): Promise<{ workspace: WorkspaceData; invitation: ApiInvitation }> {
+  const invitation = await mutation<ApiInvitation>(
+    `/api/v1/organizations/${input.organizationId}/invitations`,
+    {
+      email: input.email,
+      role: input.role,
+      expiresInDays: 7,
+    },
+  );
+  const workspace = await fetchProductionWorkspace();
+  workspace.invitations = (workspace.invitations ?? []).map((item) =>
+    item.id === invitation.id ? { ...item, ...invitation } : item,
+  );
+  return { workspace, invitation };
+}
+
+export async function cancelProductionInvitation(input: {
+  organizationId: string;
+  invitationId: string;
+}): Promise<WorkspaceData> {
+  const response = await authenticatedFetch(
+    `/api/v1/organizations/${input.organizationId}/invitations/${input.invitationId}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) {
+    throw new Error(`Invitation cancellation failed: ${response.status}`);
+  }
+  return fetchProductionWorkspace();
 }
 
 export async function createProductionProject(input: {
@@ -149,13 +217,36 @@ export async function createProductionKnowledgeItem(input: {
   return fetchProductionWorkspace();
 }
 
-export async function createProductionDocument(input: { title: string; type: string }): Promise<WorkspaceData> {
-  await mutation('/api/v1/documents', {
-    title: input.title,
-    type: input.type,
-    summary: 'Document metadata added from the workspace. File upload and extraction will be attached next.',
+export async function uploadProductionDocument(input: {
+  title: string;
+  file: File;
+}): Promise<WorkspaceData> {
+  const formData = new FormData();
+  formData.set('title', input.title);
+  formData.set('file', input.file);
+  const response = await authenticatedFetch('/api/v1/documents/upload', {
+    method: 'POST',
+    body: formData,
   });
+  if (!response.ok) {
+    throw new Error(`Document upload failed: ${response.status}`);
+  }
   return fetchProductionWorkspace();
+}
+
+export async function downloadProductionDocument(documentId: string, fileName: string) {
+  const response = await authenticatedFetch(`/api/v1/documents/${documentId}/download`);
+  if (!response.ok) {
+    throw new Error(`Document download failed: ${response.status}`);
+  }
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const link = window.document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
 
 export async function updateProductionOrganization(input: {
@@ -187,7 +278,7 @@ async function get<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function mutation(path: string, body: Record<string, unknown>) {
+async function mutation<T = void>(path: string, body: Record<string, unknown>): Promise<T> {
   const response = await authenticatedFetch(path, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -195,6 +286,8 @@ async function mutation(path: string, body: Record<string, unknown>) {
   if (!response.ok) {
     throw new Error(`Mutation failed: ${response.status}`);
   }
+  const payload = (await response.json()) as ApiResponse<T>;
+  return payload.data;
 }
 
 function normalizeKnowledgeType(type: string) {

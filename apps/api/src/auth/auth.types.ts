@@ -1,6 +1,7 @@
 export type AuthContext = {
   userId: string;
   email: string;
+  sessionId: string;
   organizationId: string;
   role: string;
 };

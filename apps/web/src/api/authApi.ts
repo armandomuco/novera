@@ -1,6 +1,6 @@
 import { ApiUser } from './demoApi';
 
-type AuthPayload = {
+export type AuthPayload = {
   user: ApiUser;
   organizationId: string;
   accessToken: string;
@@ -16,6 +16,14 @@ export type RegisterInput = {
   email: string;
   password: string;
   organizationName: string;
+};
+
+export type InvitationDetails = {
+  email: string;
+  role: string;
+  organization: { id: string; name: string };
+  expiresAt: string;
+  accountExists: boolean;
 };
 
 export async function registerUser(input: RegisterInput): Promise<AuthPayload> {
@@ -40,6 +48,46 @@ export async function loginUser(email: string, password: string): Promise<AuthPa
   });
   if (!response.ok) {
     throw new Error(`Login failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<AuthPayload>;
+  persistAuth(payload.data);
+  return payload.data;
+}
+
+export async function getInvitationDetails(token: string): Promise<InvitationDetails> {
+  const response = await fetch(`/api/v1/auth/invitations/${encodeURIComponent(token)}`);
+  if (!response.ok) {
+    throw new Error(`Invitation lookup failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<InvitationDetails>;
+  return payload.data;
+}
+
+export async function acceptInvitation(input: {
+  token: string;
+  name?: string;
+  password: string;
+}): Promise<AuthPayload> {
+  const response = await fetch('/api/v1/auth/invitations/accept', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(`Invitation acceptance failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<AuthPayload>;
+  persistAuth(payload.data);
+  return payload.data;
+}
+
+export async function switchOrganization(organizationId: string): Promise<AuthPayload> {
+  const response = await authenticatedFetch('/api/v1/auth/switch-organization', {
+    method: 'POST',
+    body: JSON.stringify({ organizationId }),
+  });
+  if (!response.ok) {
+    throw new Error(`Organization switch failed: ${response.status}`);
   }
   const payload = (await response.json()) as ApiResponse<AuthPayload>;
   persistAuth(payload.data);
@@ -99,17 +147,20 @@ export async function authenticatedFetch(path: string, options: RequestInit = {}
     clearAuth();
     throw new Error('Session expired.');
   }
-  const payload = (await refreshResponse.json()) as ApiResponse<Pick<AuthPayload, 'accessToken' | 'refreshToken'>>;
+  const payload = (await refreshResponse.json()) as ApiResponse<
+    Pick<AuthPayload, 'accessToken' | 'refreshToken'>
+  >;
   const nextAuth = { ...auth, ...payload.data };
   persistAuth(nextAuth);
   return fetch(path, withAuthHeaders(options, nextAuth.accessToken));
 }
 
 function withAuthHeaders(options: RequestInit, accessToken: string): RequestInit {
+  const hasFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData;
   return {
     ...options,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.body && !hasFormDataBody ? { 'Content-Type': 'application/json' } : {}),
       ...(options.headers ?? {}),
       Authorization: `Bearer ${accessToken}`,
     },

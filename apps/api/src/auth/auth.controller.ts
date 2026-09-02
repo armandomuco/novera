@@ -1,7 +1,18 @@
-import { Body, Controller, Get, Headers, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto, UpdateProfileDto } from './auth.dto';
+import {
+  AcceptInvitationDto,
+  LoginDto,
+  LogoutDto,
+  RefreshTokenDto,
+  RegisterDto,
+  SwitchOrganizationDto,
+  UpdateProfileDto,
+} from './auth.dto';
+import { AuthGuard } from './auth.guard';
+import { CurrentAuth } from './current-auth.decorator';
 import { AuthService } from './auth.service';
+import { AuthContext } from './auth.types';
 
 @ApiTags('auth')
 @Controller({ path: 'auth', version: '1' })
@@ -46,7 +57,31 @@ export class AuthController {
 
   @Patch('me')
   @ApiOkResponse({ description: 'Updates the authenticated user profile.' })
-  updateMe(@Headers('authorization') authorization: string | undefined, @Body() body: UpdateProfileDto) {
+  updateMe(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: UpdateProfileDto,
+  ) {
     return this.authService.updateProfile(authorization, body);
+  }
+
+  @Get('invitations/:token')
+  @ApiOkResponse({
+    description: 'Validates an invitation link and returns its public workspace details.',
+  })
+  getInvitation(@Param('token') token: string) {
+    return this.authService.getInvitation(token);
+  }
+
+  @Post('invitations/accept')
+  @ApiOkResponse({ description: 'Accepts an invitation and creates a tenant-scoped session.' })
+  acceptInvitation(@Body() body: AcceptInvitationDto) {
+    return this.authService.acceptInvitation(body);
+  }
+
+  @Post('switch-organization')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ description: 'Switches the active organization and rotates the session.' })
+  switchOrganization(@CurrentAuth() auth: AuthContext, @Body() body: SwitchOrganizationDto) {
+    return this.authService.switchOrganization(auth, body.organizationId);
   }
 }

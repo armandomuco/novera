@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { PricingPage } from './pages/PricingPage';
 import { SignupPage } from './pages/SignupPage';
+import { AcceptInvitationPage } from './pages/AcceptInvitationPage';
 import './styles/index.css';
 
 const router = createBrowserRouter([
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
   {
     path: '/signup',
     element: <SignupPage />,
+  },
+  {
+    path: '/accept-invitation',
+    element: <AcceptInvitationPage />,
   },
   {
     path: '/request-demo',

@@ -1,14 +1,22 @@
 import * as crypto from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { LoginDto, RegisterDto, UpdateProfileDto } from './auth.dto';
-import { AuthOrganization, AuthOrganizationMember, AuthSession, AuthUser } from './auth.schemas';
+import { AcceptInvitationDto, LoginDto, RegisterDto, UpdateProfileDto } from './auth.dto';
+import {
+  AuthInvitation,
+  AuthOrganization,
+  AuthOrganizationMember,
+  AuthSession,
+  AuthUser,
+} from './auth.schemas';
 import { AuthContext } from './auth.types';
 
 type TokenPayload = {
@@ -29,6 +37,7 @@ export class AuthService {
     @InjectModel(AuthOrganizationMember.name)
     private readonly organizationMemberModel: Model<AuthOrganizationMember>,
     @InjectModel(AuthSession.name) private readonly sessionModel: Model<AuthSession>,
+    @InjectModel(AuthInvitation.name) private readonly invitationModel: Model<AuthInvitation>,
   ) {}
 
   getStatus() {
@@ -43,6 +52,8 @@ export class AuthService {
           'refresh-token-rotation',
           'password hashing',
           'session persistence',
+          'invitation acceptance',
+          'organization switching',
         ],
       },
     };
@@ -89,7 +100,9 @@ export class AuthService {
   }
 
   async login(body: LoginDto) {
-    const user = await this.userModel.findOne({ email: body.email.toLowerCase(), deletedAt: null }).lean();
+    const user = await this.userModel
+      .findOne({ email: body.email.toLowerCase(), deletedAt: null })
+      .lean();
     if (!user || !this.verifyPassword(body.password, user.password)) {
       throw new UnauthorizedException('Invalid email or password.');
     }
@@ -143,7 +156,12 @@ export class AuthService {
 
     return {
       data: {
-        accessToken: this.signAccessToken(user._id, user.email, session._id, session.organizationId),
+        accessToken: this.signAccessToken(
+          user._id,
+          user.email,
+          session._id,
+          session.organizationId,
+        ),
         refreshToken: nextRefreshToken,
       },
     };
@@ -170,9 +188,7 @@ export class AuthService {
     const organizationId = new Types.ObjectId(auth.organizationId);
     const [user, membership, organization] = await Promise.all([
       this.userModel.findOne({ _id: userId, deletedAt: null }).lean(),
-      this.organizationMemberModel
-        .findOne({ userId, organizationId, status: 'active' })
-        .lean(),
+      this.organizationMemberModel.findOne({ userId, organizationId, status: 'active' }).lean(),
       this.organizationModel.findOne({ _id: organizationId, deletedAt: null }).lean(),
     ]);
     if (!user || !membership || !organization) {
@@ -208,11 +224,117 @@ export class AuthService {
     };
   }
 
+  async getInvitation(token: string) {
+    const invitation = await this.findUsableInvitation(token);
+    const organization = await this.organizationModel
+      .findOne({ _id: invitation.organizationId, deletedAt: null })
+      .lean();
+    if (!organization) {
+      throw new NotFoundException('Invitation workspace no longer exists.');
+    }
+
+    return {
+      data: {
+        email: invitation.email,
+        role: invitation.role,
+        organization: {
+          id: organization._id.toString(),
+          name: organization.name,
+        },
+        expiresAt: invitation.expiresAt.toISOString(),
+        accountExists: Boolean(
+          await this.userModel.exists({ email: invitation.email, deletedAt: null }),
+        ),
+      },
+    };
+  }
+
+  async acceptInvitation(body: AcceptInvitationDto) {
+    const invitation = await this.findUsableInvitation(body.token);
+    let user = await this.userModel.findOne({ email: invitation.email, deletedAt: null });
+
+    if (user) {
+      if (!this.verifyPassword(body.password, user.password)) {
+        throw new UnauthorizedException('Invalid password for the invited account.');
+      }
+    } else {
+      if (!body.name?.trim()) {
+        throw new BadRequestException('Name is required when creating an invited account.');
+      }
+      user = await this.userModel.create({
+        email: invitation.email,
+        password: this.hashPassword(body.password),
+        name: body.name.trim(),
+        status: 'active',
+        emailVerifiedAt: new Date(),
+        deletedAt: null,
+      });
+    }
+
+    const accepted = await this.invitationModel.findOneAndUpdate(
+      {
+        _id: invitation._id,
+        status: 'pending',
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { status: 'accepted', acceptedAt: new Date() } },
+      { new: true },
+    );
+    if (!accepted) {
+      throw new ConflictException('This invitation has already been used or expired.');
+    }
+
+    const membership = await this.organizationMemberModel.findOneAndUpdate(
+      { organizationId: invitation.organizationId, userId: user._id },
+      {
+        $set: { role: invitation.role, status: 'active', joinedAt: new Date() },
+        $setOnInsert: { organizationId: invitation.organizationId, userId: user._id },
+      },
+      { new: true, upsert: true },
+    );
+
+    return this.createSessionResponse(
+      user._id,
+      invitation.organizationId,
+      user.email,
+      user.name,
+      membership.role,
+    );
+  }
+
+  async switchOrganization(auth: AuthContext, organizationId: string) {
+    const targetOrganizationId = new Types.ObjectId(organizationId);
+    const userId = new Types.ObjectId(auth.userId);
+    const [user, organization, membership] = await Promise.all([
+      this.userModel.findOne({ _id: userId, deletedAt: null }).lean(),
+      this.organizationModel.findOne({ _id: targetOrganizationId, deletedAt: null }).lean(),
+      this.organizationMemberModel
+        .findOne({ userId, organizationId: targetOrganizationId, status: 'active' })
+        .lean(),
+    ]);
+    if (!user || !organization || !membership) {
+      throw new UnauthorizedException('You do not have access to this organization.');
+    }
+
+    const nextSession = await this.createSessionResponse(
+      user._id,
+      targetOrganizationId,
+      user.email,
+      user.name,
+      membership.role,
+    );
+    await this.sessionModel.updateOne(
+      { _id: new Types.ObjectId(auth.sessionId), userId },
+      { $set: { revokedAt: new Date() } },
+    );
+    return nextSession;
+  }
+
   async authenticateAccessToken(authorization?: string): Promise<AuthContext> {
     const payload = this.verifyAuthorization(authorization);
     const userId = new Types.ObjectId(payload.sub);
     const organizationId = new Types.ObjectId(payload.organizationId);
-    const [user, membership, organization] = await Promise.all([
+    const [user, membership, organization, session] = await Promise.all([
       this.userModel.exists({ _id: userId, deletedAt: null }),
       this.organizationMemberModel
         .findOne({
@@ -222,13 +344,21 @@ export class AuthService {
         })
         .lean(),
       this.organizationModel.exists({ _id: organizationId, deletedAt: null }),
+      this.sessionModel.exists({
+        _id: new Types.ObjectId(payload.sessionId),
+        userId,
+        organizationId,
+        revokedAt: null,
+        expiresAt: { $gt: new Date() },
+      }),
     ]);
-    if (!user || !membership || !organization) {
+    if (!user || !membership || !organization || !session) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
     return {
       userId: payload.sub,
       email: payload.email,
+      sessionId: payload.sessionId,
       organizationId: payload.organizationId,
       role: membership.role,
     };
@@ -315,6 +445,25 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
+  private async findUsableInvitation(token: string) {
+    if (token.length < 32) {
+      throw new NotFoundException('Invitation not found.');
+    }
+    const invitation = await this.invitationModel.findOne({ tokenHash: this.hashToken(token) });
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found.');
+    }
+    if (invitation.status !== 'pending') {
+      throw new ConflictException('This invitation is no longer available.');
+    }
+    if (invitation.expiresAt <= new Date()) {
+      invitation.status = 'expired';
+      await invitation.save();
+      throw new ConflictException('This invitation has expired.');
+    }
+    return invitation;
+  }
+
   private signToken(payload: TokenPayload) {
     const header = this.base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
     const body = this.base64Url(JSON.stringify(payload));
@@ -333,10 +482,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid token.');
     }
     const expected = this.sign(`${header}.${body}`, this.secretFor(type));
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (
+      signatureBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+    ) {
       throw new UnauthorizedException('Invalid token.');
     }
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenPayload;
+    let payload: TokenPayload;
+    try {
+      payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid token.');
+    }
     if (payload.type !== type || payload.exp < this.expirySeconds(0)) {
       throw new UnauthorizedException('Token expired.');
     }
@@ -352,7 +511,9 @@ export class AuthService {
   }
 
   private secretFor(type: 'access' | 'refresh') {
-    return this.configService.getOrThrow<string>(type === 'access' ? 'JWT_ACCESS_SECRET' : 'JWT_REFRESH_SECRET');
+    return this.configService.getOrThrow<string>(
+      type === 'access' ? 'JWT_ACCESS_SECRET' : 'JWT_REFRESH_SECRET',
+    );
   }
 
   private expirySeconds(secondsFromNow: number) {
@@ -360,12 +521,13 @@ export class AuthService {
   }
 
   private async uniqueOrganizationSlug(name: string) {
-    const base = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 48) || 'workspace';
+    const base =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 48) || 'workspace';
     let slug = base;
     let index = 2;
     while (await this.organizationModel.exists({ slug })) {

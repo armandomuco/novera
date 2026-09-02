@@ -31,3 +31,7 @@
 ## Security Decisions
 
 Organization IDs from clients are routing hints only. The API must verify membership and role before any read or write.
+
+## Current Dependency Baseline
+
+As of 2026-09-01, `npm audit --omit=dev` reports zero known production vulnerabilities after safe transitive updates and the React Router v7.18.3 migration.

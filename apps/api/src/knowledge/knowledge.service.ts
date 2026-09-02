@@ -19,7 +19,10 @@ export class KnowledgeService {
     private readonly activityService: ActivityService,
   ) {}
 
-  async list(auth: AuthContext, filters: { organizationId?: string; projectId?: string; type?: string }) {
+  async list(
+    auth: AuthContext,
+    filters: { organizationId?: string; projectId?: string; type?: string },
+  ) {
     const tenantId = filters.organizationId ?? auth.organizationId;
     await this.organizationsService.requireMembership(auth, tenantId);
     const query: Record<string, unknown> = {
@@ -84,7 +87,9 @@ export class KnowledgeService {
         {
           $set: {
             ...this.updatePayload(body),
-            ...(body.content ? { aiSummary: this.initialSummary(body.content), embeddingStatus: 'pending' } : {}),
+            ...(body.content
+              ? { aiSummary: this.initialSummary(body.content), embeddingStatus: 'pending' }
+              : {}),
             updatedBy: new Types.ObjectId(auth.userId),
             updatedAt: new Date(),
           },

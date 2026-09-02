@@ -90,14 +90,53 @@ export class AuthSession {
   revokedAt?: Date | null;
 }
 
+@Schema({ collection: 'invitations', timestamps: true })
+export class AuthInvitation {
+  _id!: Types.ObjectId;
+
+  @Prop({ required: true, index: true })
+  organizationId!: Types.ObjectId;
+
+  @Prop({ required: true, lowercase: true, trim: true })
+  email!: string;
+
+  @Prop({ required: true })
+  role!: string;
+
+  @Prop({ required: true })
+  tokenHash!: string;
+
+  @Prop({ required: true })
+  status!: string;
+
+  @Prop({ required: true })
+  expiresAt!: Date;
+
+  @Prop({ required: true })
+  invitedBy!: Types.ObjectId;
+
+  @Prop({ type: Date, default: null })
+  acceptedAt?: Date | null;
+
+  @Prop({ type: Date, default: null })
+  cancelledAt?: Date | null;
+}
+
 export type AuthUserDocument = HydratedDocument<AuthUser>;
 export type AuthOrganizationDocument = HydratedDocument<AuthOrganization>;
 export type AuthOrganizationMemberDocument = HydratedDocument<AuthOrganizationMember>;
 export type AuthSessionDocument = HydratedDocument<AuthSession>;
+export type AuthInvitationDocument = HydratedDocument<AuthInvitation>;
 
 export const AuthUserSchema = SchemaFactory.createForClass(AuthUser);
 export const AuthOrganizationSchema = SchemaFactory.createForClass(AuthOrganization);
 export const AuthOrganizationMemberSchema = SchemaFactory.createForClass(AuthOrganizationMember);
 export const AuthSessionSchema = SchemaFactory.createForClass(AuthSession);
+export const AuthInvitationSchema = SchemaFactory.createForClass(AuthInvitation);
 
 AuthOrganizationMemberSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
+AuthInvitationSchema.index(
+  { organizationId: 1, email: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'pending' } },
+);
+AuthInvitationSchema.index({ tokenHash: 1 }, { unique: true });

@@ -1,6 +1,22 @@
-import { IsArray, IsDateString, IsIn, IsMongoId, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsMongoId,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
-const projectStatuses = ['Planning', 'Active', 'On track', 'Review', 'Delayed', 'Archived'] as const;
+const projectStatuses = [
+  'Planning',
+  'Active',
+  'On track',
+  'Review',
+  'Delayed',
+  'Archived',
+] as const;
 const riskLevels = ['Low', 'Medium', 'High'] as const;
 
 export class CreateProjectDto {

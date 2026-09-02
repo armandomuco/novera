@@ -32,12 +32,16 @@ Base path: `/api/v1`.
 - `POST /auth/logout`: revoke active session. Authenticated.
 - `POST /auth/refresh`: rotate refresh token. Public with valid refresh token.
 - `GET /auth/me`: return the authenticated user and active organization from the bearer access token.
+- `PATCH /auth/me`: update the authenticated user's profile.
+- `GET /auth/invitations/:token`: validate a single-use invitation and return its public workspace details.
+- `POST /auth/invitations/accept`: accept as an existing user or create the invited account, then issue a tenant-scoped session.
+- `POST /auth/switch-organization`: validate membership, create a session for the selected organization, and revoke the previous session.
 - `POST /auth/password-reset/request`: send reset email. Public, rate limited.
 - `POST /auth/password-reset/confirm`: set new password. Public with reset token.
 - `POST /auth/email/verify`: verify email. Public with verification token.
 - `GET /auth/status`: returns auth module health. Public for MVP scaffolding.
 
-Current implementation note: register, login, refresh, logout, and me are implemented with MongoDB-backed users, organizations, organization memberships, sessions, scrypt password hashing, HMAC-signed JWT-compatible tokens, refresh-token rotation, and hashed refresh-token storage. Fresh access tokens are accepted by protected production routes after membership and tenant validation. Password reset and email verification remain planned.
+Current implementation note: register, login, refresh, logout, me, invitation acceptance, and organization switching are implemented with MongoDB-backed users, memberships, and sessions. Protected routes validate the underlying session as well as tenant membership. Password reset, email verification, and an audited JWT library remain planned.
 
 ## Organizations
 
@@ -45,9 +49,13 @@ Current implementation note: register, login, refresh, logout, and me are implem
 - `GET /organizations`: list memberships. Authenticated. Implemented.
 - `GET /organizations/:organizationId`: get organization. Member. Implemented with membership validation.
 - `PATCH /organizations/:organizationId`: update settings. Administrator+.
-- `POST /organizations/:organizationId/invitations`: invite member. Administrator+.
-- `POST /organizations/:organizationId/switch`: set active org context. Member.
+- `GET /organizations/:organizationId/members`: list active organization members. Member+. Implemented.
+- `GET /organizations/:organizationId/invitations`: list pending invitations. Member+. Implemented.
+- `POST /organizations/:organizationId/invitations`: invite member. Owner, Administrator, or Manager. Implemented with duplicate prevention, role validation, expiry, activity recording, and a development-only preview link.
+- `DELETE /organizations/:organizationId/invitations/:invitationId`: cancel pending invitation. Owner, Administrator, or Manager. Implemented.
 - `GET /organizations/status`: returns organization module health. Public for MVP scaffolding.
+
+Current implementation note: invitation creation, cancellation, inspection, expiry, and acceptance are implemented. Production email delivery remains planned.
 
 ## Projects
 
@@ -68,11 +76,16 @@ Current implementation note: register, login, refresh, logout, and me are implem
 
 ## Documents
 
+- `POST /documents/upload`: multipart upload for PDF, DOCX, TXT, and Markdown. Member+. Implemented with tenant validation, configurable size limits, extension/signature checks, SHA-256 checksum, malware-scanning hook, and S3-compatible storage.
+- `GET /documents/:documentId/download`: authenticated file download after document-level tenant membership validation. Implemented.
+- `GET /documents`: list tenant document metadata and processing state. Implemented.
 - `POST /organizations/:organizationId/documents`: upload. Member+. Validates type and size.
 - `GET /organizations/:organizationId/documents`: paginated list. Member+.
 - `GET /organizations/:organizationId/documents/:id`: metadata. Authorized access.
 - `GET /organizations/:organizationId/documents/:id/download`: signed URL. Authorized access.
 - `POST /organizations/:organizationId/documents/:id/reprocess`: queue processing. Manager+.
+
+Current implementation note: TXT and Markdown searchable text is extracted synchronously. PDF/DOCX extraction, BullMQ processing, chunk creation, AI summaries, and a production malware scanner remain planned.
 
 ## AI Assistant
 

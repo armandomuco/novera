@@ -7,5 +7,6 @@ coverage
 .DS_Store
 uploads
 tmp
+local-presentations
 *.log
 *.tsbuildinfo

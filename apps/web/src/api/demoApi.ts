@@ -24,7 +24,22 @@ export type WorkspaceData = {
     slug: string;
     industry?: string;
   };
+  organizations?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    role: string;
+  }>;
   users: ApiUser[];
+  invitations?: Array<{
+    id: string;
+    email: string;
+    role: string;
+    status: string;
+    expiresAt: string;
+    previewUrl?: string;
+    delivery?: string;
+  }>;
   projects: typeof projects;
   knowledgeItems: typeof knowledgeItems;
   documents: typeof documents;
@@ -119,11 +134,17 @@ export async function createDemoKnowledgeItem(input: {
   return mutateWorkspace('/api/v1/demo/knowledge-items', input);
 }
 
-export async function createDemoDocument(input: { title: string; type: string }): Promise<WorkspaceData> {
+export async function createDemoDocument(input: {
+  title: string;
+  type: string;
+}): Promise<WorkspaceData> {
   return mutateWorkspace('/api/v1/demo/documents', input);
 }
 
-async function mutateWorkspace(path: string, input: Record<string, string>): Promise<WorkspaceData> {
+async function mutateWorkspace(
+  path: string,
+  input: Record<string, string>,
+): Promise<WorkspaceData> {
   try {
     const response = await fetch(path, {
       method: 'POST',

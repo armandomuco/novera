@@ -37,7 +37,7 @@ The first build focuses on a stable demo foundation:
 
 ## Prerequisites
 
-- Node.js 20.11+
+- Node.js 20.19+ or 22.12+
 - npm 10+
 - Docker Desktop
 
@@ -49,7 +49,9 @@ cp .env.example .env
 npm run dev:start
 ```
 
-If your terminal is still using Node 16 or 18, switch to Node 20.11+ before running the app.
+`WEB_APP_URL` controls local invitation preview links and should match the frontend URL (normally `http://localhost:5173`). The local `.env` file is ignored by Git.
+
+If your terminal is still using Node 16 or 18, switch to Node 20.19+ or 22.12+ before running the app.
 
 The API defaults to `http://localhost:4000`.
 The web app defaults to `http://localhost:5173`.
@@ -77,6 +79,7 @@ mongodb://localhost:27017/novera
 
 Demo users are listed in [docs/demo-users.md](docs/demo-users.md).
 Demo workspace data is listed in [docs/demo-data.md](docs/demo-data.md).
+Current product/build status is tracked in [docs/17-current-status.md](docs/17-current-status.md).
 
 If you already have Redis and MinIO running locally too, skip Docker startup:
 

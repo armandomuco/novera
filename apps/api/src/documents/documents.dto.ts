@@ -24,3 +24,15 @@ export class CreateDocumentDto {
   @MaxLength(4000)
   summary?: string;
 }
+
+export class UploadDocumentDto {
+  @IsOptional()
+  @IsMongoId()
+  projectId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(180)
+  title?: string;
+}

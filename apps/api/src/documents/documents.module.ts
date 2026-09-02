@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { Project, ProjectSchema } from '../projects/projects.schemas';
 import { DocumentsController } from './documents.controller';
+import { DocumentStorageService } from './document-storage.service';
 import { Document, DocumentSchema } from './documents.schemas';
 import { DocumentsService } from './documents.service';
 
@@ -19,6 +20,6 @@ import { DocumentsService } from './documents.service';
     ]),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
+  providers: [DocumentsService, DocumentStorageService],
 })
 export class DocumentsModule {}

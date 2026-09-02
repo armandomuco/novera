@@ -72,32 +72,32 @@ The demo user field is named `password`. The seed script stores a hashed scrypt 
 
 ## Demo Projects
 
-| Project | Status | Risk | Owner | Summary |
-| --- | --- | --- | --- | --- |
-| Atlas onboarding | Delayed | High | Mira Chen | Blocked by missing CRM export credentials. |
-| Q3 retainer | On track | Medium | Adrian Vale | Scope is almost approved; staffing needs confirmation. |
-| Finance portal | Review | Low | Leo Marin | Requirements are under review; permissions are next. |
+| Project          | Status   | Risk   | Owner       | Summary                                                |
+| ---------------- | -------- | ------ | ----------- | ------------------------------------------------------ |
+| Atlas onboarding | Delayed  | High   | Mira Chen   | Blocked by missing CRM export credentials.             |
+| Q3 retainer      | On track | Medium | Adrian Vale | Scope is almost approved; staffing needs confirmation. |
+| Finance portal   | Review   | Low    | Leo Marin   | Requirements are under review; permissions are next.   |
 
 ## Demo Knowledge
 
-| Type | Title | Source | Project |
-| --- | --- | --- | --- |
-| Decision | Delay Atlas launch by one week | Management meeting | Atlas onboarding |
-| Meeting summary | Atlas onboarding blockers | Client success call | Atlas onboarding |
-| Note | Q3 retainer priorities | Manager note | Q3 retainer |
-| Process | Client document review workflow | Operations handbook | Finance portal |
+| Type            | Title                           | Source              | Project          |
+| --------------- | ------------------------------- | ------------------- | ---------------- |
+| Decision        | Delay Atlas launch by one week  | Management meeting  | Atlas onboarding |
+| Meeting summary | Atlas onboarding blockers       | Client success call | Atlas onboarding |
+| Note            | Q3 retainer priorities          | Manager note        | Q3 retainer      |
+| Process         | Client document review workflow | Operations handbook | Finance portal   |
 
 ## Demo Documents
 
-| Document | Type | Status | Project |
-| --- | --- | --- | --- |
-| Atlas onboarding checklist | Markdown | Summarized | Atlas onboarding |
-| Q3 retainer scope | PDF | Summarized | Q3 retainer |
-| Finance permissions draft | DOCX | Needs review | Finance portal |
+| Document                   | Type     | Status       | Project          |
+| -------------------------- | -------- | ------------ | ---------------- |
+| Atlas onboarding checklist | Markdown | Summarized   | Atlas onboarding |
+| Q3 retainer scope          | PDF      | Summarized   | Q3 retainer      |
+| Finance permissions draft  | DOCX     | Needs review | Finance portal   |
 
 ## Demo Risks
 
-| Risk | Severity | Owner | Mitigation |
-| --- | --- | --- | --- |
-| CRM export credentials still missing | High | Mira Chen | Escalate to customer sponsor and prepare fallback CSV import path. |
-| Staffing overlap during Q3 delivery | Medium | Adrian Vale | Confirm allocation before final retainer approval. |
+| Risk                                 | Severity | Owner       | Mitigation                                                         |
+| ------------------------------------ | -------- | ----------- | ------------------------------------------------------------------ |
+| CRM export credentials still missing | High     | Mira Chen   | Escalate to customer sponsor and prepare fallback CSV import path. |
+| Staffing overlap during Q3 delivery  | Medium   | Adrian Vale | Confirm allocation before final retainer approval.                 |

@@ -47,7 +47,11 @@ export function KnowledgeTwinCanvas({
     const nodeGeometry = new THREE.SphereGeometry(0.12, 32, 32);
     const smallNodeGeometry = new THREE.SphereGeometry(0.045, 16, 16);
     const coreGeometry = new THREE.DodecahedronGeometry(0.42, 1);
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x0f766e, transparent: true, opacity: 0.46 });
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x0f766e,
+      transparent: true,
+      opacity: 0.46,
+    });
     const coreMaterial = new THREE.MeshStandardMaterial({
       color: 0x134e4a,
       emissive: 0x0f766e,
@@ -71,7 +75,11 @@ export function KnowledgeTwinCanvas({
       opacity: 0.18,
       side: THREE.DoubleSide,
     });
-    const satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0x14b8a6, transparent: true, opacity: 0.72 });
+    const satelliteMaterial = new THREE.MeshBasicMaterial({
+      color: 0x14b8a6,
+      transparent: true,
+      opacity: 0.72,
+    });
 
     const core = new THREE.Mesh(coreGeometry, coreMaterial);
     group.add(core);
@@ -90,7 +98,10 @@ export function KnowledgeTwinCanvas({
       node.position.copy(point);
       group.add(node);
 
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), point]);
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        point,
+      ]);
       group.add(new THREE.Line(lineGeometry, lineMaterial));
 
       const satellite = new THREE.Mesh(smallNodeGeometry, satelliteMaterial);
@@ -158,8 +169,14 @@ export function KnowledgeTwinCanvas({
     [domainLabels[1], 'right-[12%] top-[34%] border-teal-200 bg-teal-50 text-teal-800'],
     [domainLabels[2], 'left-[18%] bottom-[18%] border-amber-200 bg-amber-50 text-amber-800'],
     [domainLabels[3], 'right-[19%] bottom-[22%] border-red-200 bg-red-50 text-red-800'],
-    [domainLabels[4], 'left-1/2 top-[12%] -translate-x-1/2 border-violet-200 bg-violet-50 text-violet-800'],
-    [domainLabels[5], 'left-1/2 bottom-[9%] -translate-x-1/2 border-cyan-200 bg-cyan-50 text-cyan-800'],
+    [
+      domainLabels[4],
+      'left-1/2 top-[12%] -translate-x-1/2 border-violet-200 bg-violet-50 text-violet-800',
+    ],
+    [
+      domainLabels[5],
+      'left-1/2 bottom-[9%] -translate-x-1/2 border-cyan-200 bg-cyan-50 text-cyan-800',
+    ],
   ];
 
   return (

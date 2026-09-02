@@ -34,7 +34,9 @@ export function DemoRequestPage() {
     try {
       const result = await requestDemo(form);
       const expiration = new Date(result.requestedDemoExpiresAt).toLocaleDateString();
-      setStatus(`${t('demoRequestSuccess')} ${t('demoRequestExpires')} ${expiration}. ${t('demoRequestSupport')} ${result.supportEmail}.`);
+      setStatus(
+        `${t('demoRequestSuccess')} ${t('demoRequestExpires')} ${expiration}. ${t('demoRequestSupport')} ${result.supportEmail}.`,
+      );
     } catch {
       setStatus(t('demoRequestFailed'));
     } finally {
@@ -47,7 +49,11 @@ export function DemoRequestPage() {
       <header className="mx-auto flex max-w-6xl items-center justify-between">
         <Logo />
         <div className="flex items-center gap-3">
-          <LanguageSelector value={language} onChange={changeLanguage} />
+          <LanguageSelector
+            value={language}
+            onChange={changeLanguage}
+            label={t('selectLanguage')}
+          />
           <Link className="text-sm font-semibold text-slate-600 hover:text-ink" to="/login">
             {t('login')}
           </Link>
@@ -56,8 +62,12 @@ export function DemoRequestPage() {
 
       <section className="mx-auto grid max-w-6xl gap-8 py-12 lg:grid-cols-[0.85fr_1.15fr]">
         <div>
-          <p className="status-pill inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.14em]">{t('requestDemo')}</p>
-          <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-normal">{t('demoRequestTitle')}</h1>
+          <p className="status-pill inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.14em]">
+            {t('requestDemo')}
+          </p>
+          <h1 className="mt-3 max-w-2xl text-4xl font-bold tracking-normal">
+            {t('demoRequestTitle')}
+          </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">{t('demoRequestBody')}</p>
           <div className="mt-6 grid gap-3">
             {[
@@ -65,7 +75,10 @@ export function DemoRequestPage() {
               [ShieldCheck, t('demoReviewedManually')],
               [Mail, t('demoRequestEmailNote')],
             ].map(([Icon, label]) => (
-              <div key={label as string} className="quiet-panel flex items-center gap-3 rounded-ui p-4">
+              <div
+                key={label as string}
+                className="quiet-panel flex items-center gap-3 rounded-ui p-4"
+              >
                 <Icon className="text-teal" size={20} aria-hidden="true" />
                 <span className="text-sm font-semibold text-slate-700">{label as string}</span>
               </div>
@@ -75,10 +88,31 @@ export function DemoRequestPage() {
 
         <form className="surface-panel rounded-ui p-6" onSubmit={submitDemoRequest}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('fullName')} value={form.name} placeholder="Alex Morgan" onChange={(name) => setForm({ ...form, name })} />
-            <Field label={t('workEmail')} type="email" value={form.email} placeholder="alex@company.com" onChange={(email) => setForm({ ...form, email })} />
-            <Field label={t('company')} value={form.company} placeholder="Northstar Consulting" onChange={(company) => setForm({ ...form, company })} />
-            <Field label={t('role')} value={form.role} placeholder="Founder, COO, Delivery Manager" onChange={(role) => setForm({ ...form, role })} />
+            <Field
+              label={t('fullName')}
+              value={form.name}
+              placeholder="Alex Morgan"
+              onChange={(name) => setForm({ ...form, name })}
+            />
+            <Field
+              label={t('workEmail')}
+              type="email"
+              value={form.email}
+              placeholder="alex@company.com"
+              onChange={(email) => setForm({ ...form, email })}
+            />
+            <Field
+              label={t('company')}
+              value={form.company}
+              placeholder="Northstar Consulting"
+              onChange={(company) => setForm({ ...form, company })}
+            />
+            <Field
+              label={t('role')}
+              value={form.role}
+              placeholder="Founder, COO, Delivery Manager"
+              onChange={(role) => setForm({ ...form, role })}
+            />
             <label className="block">
               <span className="text-sm font-semibold text-slate-700">{t('companySize')}</span>
               <select
@@ -102,7 +136,11 @@ export function DemoRequestPage() {
             </label>
           </div>
 
-          {status ? <p className="mt-4 rounded-ui bg-teal/10 p-3 text-sm font-semibold text-teal">{status}</p> : null}
+          {status ? (
+            <p className="mt-4 rounded-ui bg-teal/10 p-3 text-sm font-semibold text-teal">
+              {status}
+            </p>
+          ) : null}
 
           <button
             className="primary-action mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-ui px-5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"

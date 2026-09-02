@@ -27,7 +27,11 @@ export function LandingPage() {
       <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
         <Logo />
         <div className="flex items-center gap-3">
-          <LanguageSelector value={language} onChange={changeLanguage} />
+          <LanguageSelector
+            value={language}
+            onChange={changeLanguage}
+            label={t('selectLanguage')}
+          />
           <Link
             to="/login"
             className="hidden h-10 items-center rounded-ui px-4 text-sm font-semibold text-slate-700 transition hover:bg-white sm:inline-flex"
@@ -58,9 +62,7 @@ export function LandingPage() {
           <h1 className="mt-5 max-w-3xl text-5xl font-bold tracking-normal text-ink sm:text-6xl">
             Novera
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            {t('landingBody')}
-          </p>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">{t('landingBody')}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               to="/request-demo"
@@ -80,7 +82,14 @@ export function LandingPage() {
 
         <div className="grid gap-4">
           <KnowledgeTwinCanvas
-            domainLabels={[t('projects'), t('docs'), t('decisions'), t('currentRisks'), t('team'), t('customers')]}
+            domainLabels={[
+              t('projects'),
+              t('docs'),
+              t('decisions'),
+              t('currentRisks'),
+              t('team'),
+              t('customers'),
+            ]}
             linkedDomainsLabel={t('domainsLinked')}
             liveContextLabel={t('liveContext')}
             title={t('businessTwin')}
@@ -92,15 +101,16 @@ export function LandingPage() {
                 {t('managementFocus')}
               </p>
               <p className="mt-2 text-2xl font-bold text-ink">{t('prioritiesThisWeek')}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {t('managementFocusBody')}
-              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{t('managementFocusBody')}</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {proofPoints.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.labelKey} className="quiet-panel rounded-ui p-4 transition hover:-translate-y-0.5 hover:border-teal/30">
+                  <div
+                    key={item.labelKey}
+                    className="quiet-panel rounded-ui p-4 transition hover:-translate-y-0.5 hover:border-teal/30"
+                  >
                     <Icon className="text-signal" size={20} aria-hidden="true" />
                     <p className="mt-3 text-sm font-semibold text-slate-700">{t(item.labelKey)}</p>
                   </div>

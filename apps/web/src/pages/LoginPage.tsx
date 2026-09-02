@@ -42,16 +42,18 @@ export function LoginPage() {
       <section className="flex flex-col justify-between border-r border-line bg-white/92 px-6 py-6 shadow-sm lg:px-10">
         <Logo />
         <div className="mt-6 lg:hidden">
-          <LanguageSelector value={language} onChange={changeLanguage} />
+          <LanguageSelector
+            value={language}
+            onChange={changeLanguage}
+            label={t('selectLanguage')}
+          />
         </div>
         <div className="mx-auto w-full max-w-md py-12">
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal">
             {t('workspaceAccess')}
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-normal">{t('loginTitle')}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            {t('loginBody')}
-          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{t('loginBody')}</p>
 
           <form className="mt-8 space-y-5" autoComplete="off" onSubmit={handleSubmit}>
             <label className="block">
@@ -73,7 +75,7 @@ export function LoginPage() {
               hideLabel={t('hidePassword')}
               label={t('password')}
               autoComplete="new-password"
-              placeholder="Your password"
+              placeholder={t('currentPassword')}
               showLabel={t('showPassword')}
               value={password}
               onChange={setPassword}
@@ -113,11 +115,18 @@ export function LoginPage() {
           <div>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-bold tracking-normal">{t('accessByApproval')}</h2>
-              <LanguageSelector value={language} onChange={changeLanguage} />
+              <LanguageSelector
+                value={language}
+                onChange={changeLanguage}
+                label={t('selectLanguage')}
+              />
             </div>
             <div className="mt-6 grid gap-4">
               {[t('fiveDayDemo'), t('demoReviewedManually'), t('tenantSafe')].map((item) => (
-                <div key={item} className="quiet-panel rounded-ui p-4 text-sm font-semibold text-slate-700">
+                <div
+                  key={item}
+                  className="quiet-panel rounded-ui p-4 text-sm font-semibold text-slate-700"
+                >
                   {item}
                 </div>
               ))}

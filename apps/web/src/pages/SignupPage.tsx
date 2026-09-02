@@ -37,7 +37,11 @@ export function SignupPage() {
       <header className="mx-auto flex max-w-6xl items-center justify-between">
         <Logo />
         <div className="flex items-center gap-3">
-          <LanguageSelector value={language} onChange={changeLanguage} />
+          <LanguageSelector
+            value={language}
+            onChange={changeLanguage}
+            label={t('selectLanguage')}
+          />
           <Link className="text-sm font-semibold text-slate-600 hover:text-ink" to="/login">
             {t('login')}
           </Link>
@@ -50,16 +54,10 @@ export function SignupPage() {
             {t('startWorkspace')}
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-normal">{t('signupTitle')}</h1>
-          <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
-            {t('signupBody')}
-          </p>
+          <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">{t('signupBody')}</p>
         </div>
 
-        <form
-          className="surface-panel rounded-ui p-6"
-          autoComplete="off"
-          onSubmit={handleSubmit}
-        >
+        <form className="surface-panel rounded-ui p-6" autoComplete="off" onSubmit={handleSubmit}>
           <div className="grid gap-5">
             <label className="block">
               <span className="text-sm font-semibold text-slate-700">{t('fullName')}</span>

@@ -2,35 +2,35 @@
 
 ## Epics
 
-| Epic | Status | Priority | Complexity | Milestone |
-| --- | --- | --- | --- | --- |
-| Product validation | Planned | P0 | Medium | 0 |
-| Monorepo foundation | Done | P0 | Medium | 1 |
-| Authentication and sessions | In progress | P0 | High | 2 |
-| Organizations and permissions | In progress | P0 | High | 2 |
-| Projects and knowledge items | In progress | P0 | High | 3 |
-| Documents and processing | Planned | P0 | High | 4 |
-| Hybrid search and AI assistant | Planned | P0 | Very high | 5 |
-| Demo-ready UI | In progress | P0 | High | 6 |
-| Testing and deployment | Planned | P0 | High | 7 |
-| First real integration | Planned | P1 | High | After MVP core |
+| Epic                           | Status      | Priority | Complexity | Milestone      |
+| ------------------------------ | ----------- | -------- | ---------- | -------------- |
+| Product validation             | Planned     | P0       | Medium     | 0              |
+| Monorepo foundation            | Done        | P0       | Medium     | 1              |
+| Authentication and sessions    | In progress | P0       | High       | 2              |
+| Organizations and permissions  | In progress | P0       | High       | 2              |
+| Projects and knowledge items   | In progress | P0       | High       | 3              |
+| Documents and processing       | Planned     | P0       | High       | 4              |
+| Hybrid search and AI assistant | Planned     | P0       | Very high  | 5              |
+| Demo-ready UI                  | In progress | P0       | High       | 6              |
+| Testing and deployment         | Planned     | P0       | High       | 7              |
+| First real integration         | Planned     | P1       | High       | After MVP core |
 
 ## User Stories
 
-| Story | Acceptance Criteria | Dependencies | Priority | Complexity | Milestone | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| As a visitor, I want to understand the product quickly, so that I can decide whether to try it. | Landing page explains value and opens demo shell. | Foundation | P0 | Low | 1 | Done |
-| As a user, I want to register and verify my email, so that my account is trusted. | Email, password, verification token, secure hash, validation. | Foundation | P0 | Medium | 2 | In progress |
-| As a user, I want to create an organization, so that my company data has a tenant boundary. | Organization record, owner membership, settings. | Auth | P0 | Medium | 2 | In progress |
-| As an administrator, I want to invite members, so that my team can collaborate. | Invite email, role assignment, expiry, audit event. | Orgs | P0 | Medium | 2 | Planned |
-| As a manager, I want to create projects, so that company context is organized. | CRUD, archive, status, timeline, members. | Orgs | P0 | Medium | 3 | In progress |
-| As an employee, I want to add decisions and notes, so that context is not lost. | Knowledge item types, tags, permissions, project link. | Projects | P0 | Medium | 3 | In progress |
-| As an employee, I want to upload documents, so that they become searchable. | File validation, storage, metadata, processing status. | Knowledge | P0 | High | 4 | Planned |
-| As a manager, I want to ask why a project is delayed, so that I can act faster. | Answer uses authorized sources, citations, limits, related records. | Search/docs | P0 | Very high | 5 | Planned |
-| As an owner, I want a dashboard of risks and priorities, so that I know what to focus on. | Active projects, risks, recent decisions, documents, suggested priorities. | Projects/knowledge | P0 | Medium | 6 | In progress |
-| As an administrator, I want to see integration options, so that I understand future data sources. | Mock catalog, provider states, sync architecture copy. | Foundation | P1 | Low | 6 | In progress |
-| As a buyer, I want to request a time-limited demo, so that I can evaluate Novera without public demo credentials. | Request form saves name, email, company, role, size, use case, status, and 5-day expiration window. | Foundation | P0 | Low | 6 | Done |
-| As a buyer, I want to compare plans, so that I understand expected pricing before contacting the team. | Pricing page shows Starter, Growth, and Scale plans with clear CTAs. | Foundation | P0 | Low | 6 | Done |
+| Story                                                                                                             | Acceptance Criteria                                                                                 | Dependencies       | Priority | Complexity | Milestone | Status      |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------ | -------- | ---------- | --------- | ----------- |
+| As a visitor, I want to understand the product quickly, so that I can decide whether to try it.                   | Landing page explains value and opens demo shell.                                                   | Foundation         | P0       | Low        | 1         | Done        |
+| As a user, I want to register and verify my email, so that my account is trusted.                                 | Email, password, verification token, secure hash, validation.                                       | Foundation         | P0       | Medium     | 2         | In progress |
+| As a user, I want to create an organization, so that my company data has a tenant boundary.                       | Organization record, owner membership, settings.                                                    | Auth               | P0       | Medium     | 2         | In progress |
+| As an administrator, I want to invite members, so that my team can collaborate.                                   | Invite email, role assignment, expiry, cancellation, and activity event.                            | Orgs               | P0       | Medium     | 2         | In progress |
+| As a manager, I want to create projects, so that company context is organized.                                    | CRUD, archive, status, timeline, members.                                                           | Orgs               | P0       | Medium     | 3         | In progress |
+| As an employee, I want to add decisions and notes, so that context is not lost.                                   | Knowledge item types, tags, permissions, project link.                                              | Projects           | P0       | Medium     | 3         | In progress |
+| As an employee, I want to upload documents, so that they become searchable.                                       | File validation, storage, metadata, processing status.                                              | Knowledge          | P0       | High       | 4         | Planned     |
+| As a manager, I want to ask why a project is delayed, so that I can act faster.                                   | Answer uses authorized sources, citations, limits, related records.                                 | Search/docs        | P0       | Very high  | 5         | Planned     |
+| As an owner, I want a dashboard of risks and priorities, so that I know what to focus on.                         | Active projects, risks, recent decisions, documents, suggested priorities.                          | Projects/knowledge | P0       | Medium     | 6         | In progress |
+| As an administrator, I want to see integration options, so that I understand future data sources.                 | Mock catalog, provider states, sync architecture copy.                                              | Foundation         | P1       | Low        | 6         | In progress |
+| As a buyer, I want to request a time-limited demo, so that I can evaluate Novera without public demo credentials. | Request form saves name, email, company, role, size, use case, status, and 5-day expiration window. | Foundation         | P0       | Low        | 6         | Done        |
+| As a buyer, I want to compare plans, so that I understand expected pricing before contacting the team.            | Pricing page shows Starter, Growth, and Scale plans with clear CTAs.                                | Foundation         | P0       | Low        | 6         | Done        |
 
 ## Initial Sprint Plan
 
@@ -82,6 +82,18 @@ Tasks:
 - Add production organization settings update through `PATCH /api/v1/organizations/:organizationId`.
 - Add production document metadata module with `GET /api/v1/documents` and `POST /api/v1/documents`.
 - Wire profile, settings, and document metadata controls to production APIs.
+- Create local `.env` for development while keeping real env files ignored by git.
+- Add production organization members and pending invitations endpoints.
+- Add pending invitation creation, cancellation, expiry metadata, duplicate prevention, role validation, and activity-event recording.
+- Add Team page invite form, role selector, pending invitation list, and cancel action for real authenticated workspaces.
+- Add secure invitation inspection and acceptance for existing and new users.
+- Add development-only invitation preview links while keeping production tokens private.
+- Add tenant-scoped organization switching with session rotation.
+- Verify invitation and switching flows end to end against local MongoDB.
+- Replace the metadata-only document form with real multipart file upload.
+- Add S3-compatible MinIO storage, file validation, checksums, processing states, and authenticated download.
+- Extract searchable TXT and Markdown content synchronously while PDF/DOCX jobs remain pending.
+- Verify Markdown upload, extraction, checksum, download, and unsupported-file rejection end to end.
 
 Acceptance criteria:
 
@@ -133,6 +145,15 @@ Acceptance criteria:
 - Profile name updates now persist through the authenticated API.
 - Organization name, industry, and AI-provider preference now persist through the authenticated organization API.
 - Document metadata creation/listing now works for real authenticated workspaces and records activity events.
+- Local `.env` exists for development and remains ignored by git.
+- Organization members can be listed through `GET /api/v1/organizations/:organizationId/members`.
+- Pending organization invitations can be listed, created, and cancelled through production APIs.
+- Team page now supports inviting members and cancelling pending invitations for real authenticated workspaces.
+- Existing and new users can accept single-use, expiring invitations through a dedicated page.
+- Users with multiple memberships can switch organizations from the application header.
+- Authenticated requests now reject revoked or expired backing sessions.
+- Real document uploads and authorized downloads work against MinIO/S3-compatible storage.
+- TXT and Markdown documents become searchable immediately; PDF and DOCX show an extraction-pending state.
 
 ## Still To Do Next
 
@@ -140,8 +161,8 @@ Acceptance criteria:
 - Add email verification and password reset flows.
 - Add an internal admin review screen for demo requests and manual demo workspace creation.
 - Enforce demo account expiration in authentication/session validation once demo accounts are created by the team.
-- Add invitation and organization switching flows.
-- Replace metadata-only document creation with real file upload, object storage, extraction, chunking, and malware-scanning integration point.
+- Connect production email delivery for invitation links.
+- Add PDF/DOCX extraction, document chunks, background processing, and a production malware-scanning provider.
 - Add ownership/resource-level permission rules beyond basic role membership.
 - Connect all dashboard data to production API modules instead of demo endpoints.
 - Replace localStorage profile updates with API-backed user profile updates.

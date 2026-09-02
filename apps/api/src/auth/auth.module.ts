@@ -9,6 +9,8 @@ import {
   AuthOrganizationSchema,
   AuthSession,
   AuthSessionSchema,
+  AuthInvitation,
+  AuthInvitationSchema,
   AuthUser,
   AuthUserSchema,
 } from './auth.schemas';
@@ -21,6 +23,7 @@ import { AuthService } from './auth.service';
       { name: AuthOrganization.name, schema: AuthOrganizationSchema },
       { name: AuthOrganizationMember.name, schema: AuthOrganizationMemberSchema },
       { name: AuthSession.name, schema: AuthSessionSchema },
+      { name: AuthInvitation.name, schema: AuthInvitationSchema },
     ]),
   ],
   controllers: [AuthController],

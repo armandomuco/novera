@@ -4,9 +4,10 @@ import { languages } from '../data/demoWorkspace';
 type LanguageSelectorProps = {
   value: string;
   onChange: (value: string) => void;
+  label: string;
 };
 
-export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
+export function LanguageSelector({ value, onChange, label }: LanguageSelectorProps) {
   const selected = languages.find((language) => language.code === value) ?? languages[0];
 
   return (
@@ -17,7 +18,7 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
       <span className="pointer-events-none flex-1">{selected.name}</span>
       <ChevronDown size={16} className="pointer-events-none text-slate-400" aria-hidden="true" />
       <select
-        aria-label="Select language"
+        aria-label={label}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         value={value}
         onChange={(event) => onChange(event.target.value)}

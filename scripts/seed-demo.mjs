@@ -244,7 +244,11 @@ async function upsertDemoData() {
       name: 'Atlas onboarding',
       status: 'Delayed',
       description: 'Customer onboarding project blocked by missing CRM export credentials.',
-      objectives: ['Import customer data', 'Approve onboarding checklist', 'Launch customer portal'],
+      objectives: [
+        'Import customer data',
+        'Approve onboarding checklist',
+        'Launch customer portal',
+      ],
       ownerName: 'Mira Chen',
       riskLevel: 'High',
       dueDate: new Date('2026-08-05'),
@@ -330,7 +334,8 @@ async function upsertDemoData() {
       content:
         'Documents move from upload to extraction, summary, approval, and archive. Restricted project files require explicit access.',
       tags: ['documents', 'process', 'permissions'],
-      aiSummary: 'Document review includes extraction, summary, approval, archive, and access checks.',
+      aiSummary:
+        'Document review includes extraction, summary, approval, archive, and access checks.',
     },
   ];
 
@@ -455,7 +460,9 @@ async function upsertDemoData() {
   const counts = {
     users: await User.countDocuments({ email: /@novera\.test$/ }),
     organizations: await Organization.countDocuments({ slug: 'acme-studio' }),
-    organizationMembers: await OrganizationMember.countDocuments({ organizationId: organization._id }),
+    organizationMembers: await OrganizationMember.countDocuments({
+      organizationId: organization._id,
+    }),
     projects: await Project.countDocuments({ organizationId: organization._id }),
     knowledgeItems: await KnowledgeItem.countDocuments({ organizationId: organization._id }),
     documents: await Document.countDocuments({ organizationId: organization._id }),
@@ -463,7 +470,9 @@ async function upsertDemoData() {
     activityEvents: await ActivityEvent.countDocuments({ organizationId: organization._id }),
   };
 
-  console.log(JSON.stringify({ database: mongoose.connection.name, uri: MONGODB_URI, counts }, null, 2));
+  console.log(
+    JSON.stringify({ database: mongoose.connection.name, uri: MONGODB_URI, counts }, null, 2),
+  );
 }
 
 upsertDemoData()

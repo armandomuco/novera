@@ -32,7 +32,10 @@ export class DemoService {
 
     const organizationId = organization._id;
     const [users, projects, knowledgeItems, documents, risks, activities] = await Promise.all([
-      this.userModel.find({ email: /@novera\.test$/ }).sort({ roleLabel: 1 }).lean(),
+      this.userModel
+        .find({ email: /@novera\.test$/ })
+        .sort({ roleLabel: 1 })
+        .lean(),
       this.projectModel.find({ organizationId }).sort({ dueDate: 1 }).lean(),
       this.knowledgeModel.find({ organizationId }).sort({ title: 1 }).lean(),
       this.documentModel.find({ organizationId }).sort({ title: 1 }).lean(),
@@ -162,7 +165,13 @@ export class DemoService {
       updatedAt: new Date(),
       deletedAt: null,
     });
-    await this.recordActivity(organization._id, 'Olivia Stone', 'project.created', 'project', project.name);
+    await this.recordActivity(
+      organization._id,
+      'Olivia Stone',
+      'project.created',
+      'project',
+      project.name,
+    );
     return this.getWorkspace();
   }
 
@@ -180,7 +189,13 @@ export class DemoService {
       updatedAt: new Date(),
       deletedAt: null,
     });
-    await this.recordActivity(organization._id, 'Olivia Stone', 'knowledge.created', 'knowledge_item', item.title);
+    await this.recordActivity(
+      organization._id,
+      'Olivia Stone',
+      'knowledge.created',
+      'knowledge_item',
+      item.title,
+    );
     return this.getWorkspace();
   }
 
@@ -199,7 +214,13 @@ export class DemoService {
       updatedAt: new Date(),
       deletedAt: null,
     });
-    await this.recordActivity(organization._id, 'Leo Marin', 'document.created', 'document', document.title);
+    await this.recordActivity(
+      organization._id,
+      'Leo Marin',
+      'document.created',
+      'document',
+      document.title,
+    );
     return this.getWorkspace();
   }
 
@@ -259,7 +280,8 @@ export class DemoService {
   private mimeTypeFor(type?: string) {
     const normalized = type?.toLowerCase();
     if (normalized === 'pdf') return 'application/pdf';
-    if (normalized === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (normalized === 'docx')
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     if (normalized === 'markdown') return 'text/markdown';
     return 'text/plain';
   }

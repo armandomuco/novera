@@ -4,23 +4,23 @@
 
 Fifteen name options:
 
-| Name | Memorability | Pronunciation | Brand Potential | Product Fit | Global Fit | Domain Flexibility |
-| --- | --- | --- | --- | --- | --- | --- |
-| Novera | High | Easy | High | High | High | High |
-| Kentro | High | Easy | High | High | High | Medium |
-| Memora | High | Easy | Medium | High | High | Medium |
-| Synora | High | Easy | High | High | High | High |
-| Auralis | Medium | Medium | High | Medium | High | Medium |
-| Clario | Medium | Easy | Medium | Medium | High | Medium |
-| Nexora | High | Easy | Medium | High | High | Medium |
-| Firmora | Medium | Easy | Medium | Medium | Medium | Medium |
-| Veyra | High | Easy | High | Medium | High | High |
-| Cogniva | Medium | Medium | Medium | High | High | Medium |
-| Klera | Medium | Easy | Medium | Medium | High | High |
-| Omniva | Medium | Easy | Medium | High | High | Medium |
-| Linkora | Medium | Easy | Medium | High | High | Medium |
-| StrataIQ | Medium | Easy | Medium | High | Medium | Medium |
-| Orvian | Medium | Easy | High | Medium | High | High |
+| Name     | Memorability | Pronunciation | Brand Potential | Product Fit | Global Fit | Domain Flexibility |
+| -------- | ------------ | ------------- | --------------- | ----------- | ---------- | ------------------ |
+| Novera   | High         | Easy          | High            | High        | High       | High               |
+| Kentro   | High         | Easy          | High            | High        | High       | Medium             |
+| Memora   | High         | Easy          | Medium          | High        | High       | Medium             |
+| Synora   | High         | Easy          | High            | High        | High       | High               |
+| Auralis  | Medium       | Medium        | High            | Medium      | High       | Medium             |
+| Clario   | Medium       | Easy          | Medium          | Medium      | High       | Medium             |
+| Nexora   | High         | Easy          | Medium          | High        | High       | Medium             |
+| Firmora  | Medium       | Easy          | Medium          | Medium      | Medium     | Medium             |
+| Veyra    | High         | Easy          | High            | Medium      | High       | High               |
+| Cogniva  | Medium       | Medium        | Medium          | High        | High       | Medium             |
+| Klera    | Medium       | Easy          | Medium          | Medium      | High       | High               |
+| Omniva   | Medium       | Easy          | Medium          | High        | High       | Medium             |
+| Linkora  | Medium       | Easy          | Medium          | High        | High       | Medium             |
+| StrataIQ | Medium       | Easy          | Medium          | High        | Medium     | Medium             |
+| Orvian   | Medium       | Easy          | High            | Medium      | High       | High               |
 
 Top three: Novera, Synora, Kentro.
 

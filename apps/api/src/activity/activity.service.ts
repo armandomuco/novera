@@ -15,7 +15,9 @@ type RecordActivityInput = {
 
 @Injectable()
 export class ActivityService {
-  constructor(@InjectModel(ActivityEvent.name) private readonly activityModel: Model<ActivityEvent>) {}
+  constructor(
+    @InjectModel(ActivityEvent.name) private readonly activityModel: Model<ActivityEvent>,
+  ) {}
 
   async record(auth: AuthContext, input: RecordActivityInput) {
     await this.activityModel.create({

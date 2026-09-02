@@ -2,12 +2,17 @@ import {
   Activity,
   AlertTriangle,
   Bot,
+  Building2,
   CheckCircle2,
+  Copy,
+  Download,
   FileText,
   FolderKanban,
   Home,
   LockKeyhole,
   LogOut,
+  Mail,
+  Menu,
   Plug,
   Search,
   Settings,
@@ -15,11 +20,13 @@ import {
   Sparkles,
   Upload,
   UserCircle,
+  UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clearAuth, updateCurrentUser } from '../api/authApi';
+import { clearAuth, switchOrganization, updateCurrentUser } from '../api/authApi';
 import {
   createDemoKnowledgeItem,
   createDemoProject,
@@ -28,11 +35,14 @@ import {
   WorkspaceData,
 } from '../api/demoApi';
 import {
+  cancelProductionInvitation,
+  createProductionInvitation,
   createProductionKnowledgeItem,
-  createProductionDocument,
   createProductionProject,
   fetchProductionWorkspace,
   hasProductionSession,
+  downloadProductionDocument,
+  uploadProductionDocument,
   updateProductionOrganization,
 } from '../api/productionApi';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
@@ -40,7 +50,6 @@ import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import {
   activities,
-  assistantQuestions,
   demoUsers,
   documents,
   getDemoUserByEmail,
@@ -84,12 +93,13 @@ export function AppShell() {
   const [activeView, setActiveView] = useState('Dashboard');
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
   const [query, setQuery] = useState('');
-  const [assistantQuestion, setAssistantQuestion] = useState(assistantQuestions[0]);
+  const [assistantQuestion, setAssistantQuestion] = useState('');
   const [assistantAnswer, setAssistantAnswer] = useState('');
   const [currentUser, setCurrentUser] = useState(getStoredUser);
   const [notice, setNotice] = useState('');
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+  const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
 
   const t = (key: TranslationKey) => translate(language, key);
 
@@ -130,8 +140,15 @@ export function AppShell() {
   }, [navigate]);
 
   const workspaceData = workspace ?? {
-    organization: { id: undefined, name: 'Acme Studio', slug: 'acme-studio', industry: 'Digital agency' },
+    organization: {
+      id: undefined,
+      name: 'Acme Studio',
+      slug: 'acme-studio',
+      industry: 'Digital agency',
+    },
+    organizations: [],
     users: demoUsers,
+    invitations: [],
     projects,
     knowledgeItems,
     documents,
@@ -143,14 +160,19 @@ export function AppShell() {
   const filteredKnowledge = useMemo(() => {
     const normalized = query.toLowerCase();
     return workspaceData.knowledgeItems.filter((item) =>
-      [item.title, item.summary, item.type, item.project].join(' ').toLowerCase().includes(normalized),
+      [item.title, item.summary, item.type, item.project]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalized),
     );
   }, [query, workspaceData.knowledgeItems]);
 
   function changeLanguage(value: string) {
     setLanguage(value);
     window.localStorage.setItem('novera-language', value);
-    showNotice(`${t('languageChanged')}: ${value.toUpperCase()}`);
+    setAssistantQuestion('');
+    setAssistantAnswer('');
+    showNotice(`${translate(value, 'languageChanged')}: ${value.toUpperCase()}`);
   }
 
   function showNotice(message: string) {
@@ -173,6 +195,11 @@ export function AppShell() {
     clearAuth();
     window.localStorage.removeItem('novera-demo-user');
     navigate('/login');
+  }
+
+  function openView(view: string) {
+    setActiveView(view);
+    setIsMobileNavigationOpen(false);
   }
 
   async function saveProfile(name: string) {
@@ -209,16 +236,28 @@ export function AppShell() {
     }
   }
 
-  async function createDocument(input: { title: string; type: string }) {
+  async function createDocument(input: { title: string; file: File }) {
     try {
-      const data = await createProductionDocument(input);
-      replaceWorkspace(data, t('documentMetadataCreated'));
+      const data = await uploadProductionDocument(input);
+      replaceWorkspace(data, t('documentUploaded'));
     } catch {
       showNotice(t('saveFailed'));
     }
   }
 
-  async function saveOrganizationSettings(input: { name: string; industry: string; aiProvider: string }) {
+  async function downloadDocument(documentId: string, title: string) {
+    try {
+      await downloadProductionDocument(documentId, title);
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function saveOrganizationSettings(input: {
+    name: string;
+    industry: string;
+    aiProvider: string;
+  }) {
     if (!workspaceData.organization.id) {
       showNotice(t('saveFailed'));
       return;
@@ -229,6 +268,57 @@ export function AppShell() {
         ...input,
       });
       replaceWorkspace(data, t('settingsSaved'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function inviteTeamMember(input: { email: string; role: string }) {
+    if (!workspaceData.organization.id || !hasProductionSession()) {
+      showNotice(t('inviteRequiresLiveWorkspace'));
+      return;
+    }
+    try {
+      const result = await createProductionInvitation({
+        organizationId: workspaceData.organization.id,
+        ...input,
+      });
+      replaceWorkspace(result.workspace, t('invitationCreated'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function changeOrganization(organizationId: string) {
+    if (!organizationId || organizationId === workspaceData.organization.id) {
+      return;
+    }
+    setIsLoadingWorkspace(true);
+    try {
+      const auth = await switchOrganization(organizationId);
+      setCurrentUser({ ...currentUser, ...auth.user, focus: currentUser.focus });
+      const data = await fetchProductionWorkspace();
+      setWorkspace(data);
+      setActiveView('Dashboard');
+      showNotice(t('organizationSwitched'));
+    } catch {
+      showNotice(t('organizationSwitchFailed'));
+    } finally {
+      setIsLoadingWorkspace(false);
+    }
+  }
+
+  async function cancelTeamInvitation(invitationId: string) {
+    if (!workspaceData.organization.id || !hasProductionSession()) {
+      showNotice(t('inviteRequiresLiveWorkspace'));
+      return;
+    }
+    try {
+      const data = await cancelProductionInvitation({
+        organizationId: workspaceData.organization.id,
+        invitationId,
+      });
+      replaceWorkspace(data, t('invitationCancelled'));
     } catch {
       showNotice(t('saveFailed'));
     }
@@ -253,7 +343,7 @@ export function AppShell() {
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
                 type="button"
-                onClick={() => setActiveView(item.view)}
+                onClick={() => openView(item.view)}
               >
                 <Icon size={18} aria-hidden="true" />
                 {t(item.key)}
@@ -269,7 +359,7 @@ export function AppShell() {
             <button
               className="inline-flex h-9 items-center justify-center gap-2 rounded-ui border border-white/15 bg-white/10 text-xs font-semibold text-white"
               type="button"
-              onClick={() => setActiveView('Profile')}
+              onClick={() => openView('Profile')}
             >
               <UserCircle size={15} aria-hidden="true" />
               {t('profile')}
@@ -286,18 +376,118 @@ export function AppShell() {
         </div>
       </aside>
 
+      {isMobileNavigationOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            className="absolute inset-0 bg-navy/55"
+            type="button"
+            aria-label={t('closeNavigation')}
+            onClick={() => setIsMobileNavigationOpen(false)}
+          />
+          <aside className="relative h-full w-72 max-w-[86vw] bg-navy px-4 py-5 text-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 [&_*]:text-white">
+              <Logo />
+              <button
+                className="inline-flex h-10 w-10 items-center justify-center rounded-ui border border-white/15 bg-white/10"
+                type="button"
+                aria-label={t('closeNavigation')}
+                onClick={() => setIsMobileNavigationOpen(false)}
+              >
+                <X size={19} aria-hidden="true" />
+              </button>
+            </div>
+            <nav className="mt-8 space-y-1" aria-label={t('mainNavigation')}>
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.view === activeView;
+                return (
+                  <button
+                    key={item.view}
+                    className={`flex h-10 w-full items-center gap-3 rounded-ui px-3 text-left text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-white text-navy shadow-sm'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    }`}
+                    type="button"
+                    onClick={() => openView(item.view)}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    {t(item.key)}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="absolute bottom-5 left-4 right-4 rounded-ui border border-white/10 bg-white/8 p-3">
+              <p className="text-sm font-bold text-white">{currentUser.name}</p>
+              <p className="text-xs text-slate-300">{currentUser.role}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-ui border border-white/15 bg-white/10 text-xs font-semibold text-white"
+                  type="button"
+                  onClick={() => openView('Profile')}
+                >
+                  <UserCircle size={15} aria-hidden="true" />
+                  {t('profile')}
+                </button>
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-ui bg-white text-xs font-semibold text-navy"
+                  type="button"
+                  onClick={logout}
+                >
+                  <LogOut size={15} aria-hidden="true" />
+                  {t('logout')}
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       <main className="lg:pl-64">
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line bg-white/88 px-6 py-3 shadow-sm backdrop-blur">
-          <div>
-            <p className="text-sm text-slate-500">{workspaceData.organization.name}</p>
-            <h1 className="text-xl font-bold tracking-normal">
-              {activeView === 'Profile'
-                ? t('profile')
-                : t(navItems.find((item) => item.view === activeView)?.key ?? 'dashboard')}
-            </h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              className="secondary-action inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-ui lg:hidden"
+              type="button"
+              aria-label={t('openNavigation')}
+              onClick={() => setIsMobileNavigationOpen(true)}
+            >
+              <Menu size={20} aria-hidden="true" />
+            </button>
+            <div className="min-w-0">
+              {(workspaceData.organizations?.length ?? 0) > 1 ? (
+                <label className="mb-1 flex items-center gap-2 text-sm text-slate-500">
+                  <Building2 size={15} aria-hidden="true" />
+                  <span className="sr-only">{t('switchOrganization')}</span>
+                  <select
+                    className="border-0 bg-transparent pr-2 text-sm font-semibold text-slate-600 outline-none"
+                    aria-label={t('switchOrganization')}
+                    value={workspaceData.organization.id}
+                    onChange={(event) => changeOrganization(event.target.value)}
+                  >
+                    {workspaceData.organizations?.map((organization) => (
+                      <option key={organization.id} value={organization.id}>
+                        {organization.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="text-sm text-slate-500">{workspaceData.organization.name}</p>
+              )}
+              <h1 className="text-xl font-bold tracking-normal">
+                {activeView === 'Profile'
+                  ? t('profile')
+                  : t(navItems.find((item) => item.view === activeView)?.key ?? 'dashboard')}
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSelector value={language} onChange={changeLanguage} />
+            <LanguageSelector
+              value={language}
+              onChange={changeLanguage}
+              label={t('selectLanguage')}
+            />
             <button
               className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
               type="button"
@@ -350,14 +540,19 @@ export function AppShell() {
           ) : activeView === 'Documents' ? (
             <DocumentsView
               data={workspaceData}
+              onDownloadDocument={downloadDocument}
               onCreateDocument={createDocument}
-              showNotice={showNotice}
               t={t}
             />
           ) : activeView === 'Integrations' ? (
             <IntegrationsView showNotice={showNotice} t={t} />
           ) : activeView === 'Team' ? (
-            <TeamView data={workspaceData} t={t} />
+            <TeamView
+              data={workspaceData}
+              onCancelInvitation={cancelTeamInvitation}
+              onInvite={inviteTeamMember}
+              t={t}
+            />
           ) : activeView === 'Activity' ? (
             <ActivityView data={workspaceData} t={t} />
           ) : activeView === 'Profile' ? (
@@ -380,7 +575,8 @@ function DashboardView({
   onAsk: (question: string) => void;
   t: (key: TranslationKey) => string;
 }) {
-  const hasWorkspaceSignal = data.projects.length + data.knowledgeItems.length + data.documents.length > 0;
+  const hasWorkspaceSignal =
+    data.projects.length + data.knowledgeItems.length + data.documents.length > 0;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
@@ -389,10 +585,17 @@ function DashboardView({
           {[
             [t('activeProjects'), String(data.projects.length), FolderKanban],
             [t('openRisks'), String(data.risks.length), AlertTriangle],
-            [t('recentDecisions'), String(data.knowledgeItems.filter((item) => item.type === 'Decision').length), CheckCircle2],
+            [
+              t('recentDecisions'),
+              String(data.knowledgeItems.filter((item) => item.type === 'Decision').length),
+              CheckCircle2,
+            ],
             [t('documents'), String(data.documents.length), FileText],
           ].map(([label, value, Icon]) => (
-            <div key={label as string} className="surface-panel rounded-ui p-4 transition hover:-translate-y-0.5">
+            <div
+              key={label as string}
+              className="surface-panel rounded-ui p-4 transition hover:-translate-y-0.5"
+            >
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-ui bg-teal/10">
                 <Icon className="text-teal" size={20} aria-hidden="true" />
               </span>
@@ -407,13 +610,19 @@ function DashboardView({
             <div className="grid gap-5 lg:grid-cols-[1fr_0.8fr]">
               <div>
                 <p className="text-sm font-semibold text-teal">{t('emptyWorkspaceEyebrow')}</p>
-                <h2 className="mt-2 text-2xl font-bold tracking-normal">{t('emptyWorkspaceTitle')}</h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{t('emptyWorkspaceBody')}</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-normal">
+                  {t('emptyWorkspaceTitle')}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                  {t('emptyWorkspaceBody')}
+                </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button
                     className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
                     type="button"
-                    onClick={() => onAsk('What information should we add first to build this company twin?')}
+                    onClick={() =>
+                      onAsk('What information should we add first to build this company twin?')
+                    }
                   >
                     <Sparkles size={16} aria-hidden="true" />
                     {t('planFirstWorkspace')}
@@ -421,61 +630,74 @@ function DashboardView({
                   <button
                     className="secondary-action inline-flex h-10 items-center rounded-ui px-4 text-sm font-semibold"
                     type="button"
-                    onClick={() => onAsk('What should management focus on this week with no workspace data yet?')}
+                    onClick={() =>
+                      onAsk('What should management focus on this week with no workspace data yet?')
+                    }
                   >
                     {t('askReadinessQuestion')}
                   </button>
                 </div>
               </div>
               <div className="grid gap-3">
-                {['emptyStepProject', 'emptyStepKnowledge', 'emptyStepDocument'].map((step, index) => (
-                  <div key={step} className="quiet-panel flex gap-3 rounded-ui p-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ui bg-teal/10 text-sm font-bold text-teal">
-                      {index + 1}
-                    </span>
-                    <p className="text-sm font-semibold leading-6 text-slate-700">{t(step)}</p>
-                  </div>
-                ))}
+                {['emptyStepProject', 'emptyStepKnowledge', 'emptyStepDocument'].map(
+                  (step, index) => (
+                    <div key={step} className="quiet-panel flex gap-3 rounded-ui p-4">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ui bg-teal/10 text-sm font-bold text-teal">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm font-semibold leading-6 text-slate-700">{t(step)}</p>
+                    </div>
+                  ),
+                )}
               </div>
             </div>
           </div>
         ) : null}
 
-        <div className="surface-panel rounded-ui p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-teal">{t('managementPriorities')}</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('thisWeek')}</h2>
+        {hasWorkspaceSignal ? (
+          <div className="surface-panel rounded-ui p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-teal">{t('managementPriorities')}</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('thisWeek')}</h2>
+              </div>
+              <button
+                className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
+                type="button"
+                onClick={() => onAsk('What should management focus on this week?')}
+              >
+                <Sparkles size={16} aria-hidden="true" />
+                {t('explainPriorities')}
+              </button>
             </div>
-            <button
-              className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
-              type="button"
-              onClick={() => onAsk('What should management focus on this week?')}
-            >
-              <Sparkles size={16} aria-hidden="true" />
-              {t('explainPriorities')}
-            </button>
-          </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {['priorityAtlasCredentials', 'priorityRetainerScope', 'priorityFinancePermissions'].map(
-              (priority) => (
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                'priorityAtlasCredentials',
+                'priorityRetainerScope',
+                'priorityFinancePermissions',
+              ].map((priority) => (
                 <div key={priority} className="quiet-panel rounded-ui p-4">
                   <p className="text-sm font-semibold text-slate-800">{t(priority)}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {t('linkedToActivity')}
-                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{t('linkedToActivity')}</p>
                 </div>
-              ),
-            )}
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       </div>
 
       <div className="space-y-5">
         <KnowledgeTwinCanvas
-          domainLabels={[t('projects'), t('docs'), t('decisions'), t('currentRisks'), t('team'), t('customers')]}
+          domainLabels={[
+            t('projects'),
+            t('docs'),
+            t('decisions'),
+            t('currentRisks'),
+            t('team'),
+            t('customers'),
+          ]}
           linkedDomainsLabel={t('domainsLinked')}
           liveContextLabel={t('liveContext')}
           title={t('businessTwin')}
@@ -508,6 +730,7 @@ function AssistantView({
         <h2 className="text-lg font-bold tracking-normal">{t('askBusinessMemory')}</h2>
         <textarea
           className="mt-4 min-h-32 w-full field-frame rounded-ui p-3 text-sm outline-none"
+          placeholder={t('assistantQuestionFocus')}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
         />
@@ -520,7 +743,12 @@ function AssistantView({
           {t('generateAnswer')}
         </button>
         <div className="mt-5 grid gap-2">
-          {assistantQuestions.map((sample) => (
+          {[
+            t('assistantQuestionDelay'),
+            t('assistantQuestionChanges'),
+            t('assistantQuestionFocus'),
+            t('assistantQuestionDocument'),
+          ].map((sample) => (
             <button
               key={sample}
               className="quiet-panel rounded-ui px-3 py-2 text-left text-sm font-medium text-slate-700 hover:border-teal/40 hover:bg-white"
@@ -535,9 +763,7 @@ function AssistantView({
 
       <div className="surface-panel rounded-ui p-5">
         <p className="text-sm font-semibold text-teal">{t('answer')}</p>
-        <p className="mt-3 text-base leading-7 text-slate-700">
-          {answer || t('assistantEmpty')}
-        </p>
+        <p className="mt-3 text-base leading-7 text-slate-700">{answer || t('assistantEmpty')}</p>
         <div className="mt-5 grid gap-3">
           {data.knowledgeItems.slice(0, 3).map((source) => (
             <div key={source.title} className="quiet-panel rounded-ui p-4">
@@ -547,7 +773,9 @@ function AssistantView({
           ))}
         </div>
         <p className="mt-4 rounded-ui bg-blue-50 p-3 text-sm font-medium text-blue-800">
-          {t('assistantConfidence')}
+          {data.projects.length + data.knowledgeItems.length + data.documents.length > 0
+            ? t('assistantConfidence')
+            : t('assistantConfidenceLimited')}
         </p>
       </div>
     </div>
@@ -560,14 +788,17 @@ function generateWorkspaceAnswer(
   t: (key: TranslationKey) => string,
 ) {
   const normalized = question.toLowerCase();
+  const includesAny = (terms: string[]) => terms.some((term) => normalized.includes(term));
   const delayedProject = data.projects.find((project) =>
     [project.name, project.status, project.summary].join(' ').toLowerCase().includes('delayed'),
   );
-  const matchedProject = data.projects.find((project) =>
-    normalized.includes(project.name.toLowerCase()),
-  ) ?? delayedProject;
+  const matchedProject =
+    data.projects.find((project) => normalized.includes(project.name.toLowerCase())) ??
+    delayedProject;
   const relatedKnowledge = data.knowledgeItems.filter((item) =>
-    matchedProject ? item.project === matchedProject.name : normalized.includes(item.type.toLowerCase()),
+    matchedProject
+      ? item.project === matchedProject.name
+      : normalized.includes(item.type.toLowerCase()),
   );
   const recentActivity = data.activities.slice(0, 3);
 
@@ -575,7 +806,21 @@ function generateWorkspaceAnswer(
     return t('assistantNoInformation');
   }
 
-  if (normalized.includes('delayed') || normalized.includes('delay') || normalized.includes('why')) {
+  if (
+    includesAny([
+      'delayed',
+      'delay',
+      'why',
+      'vonuar',
+      'pse',
+      'ritardo',
+      'perché',
+      'verzögert',
+      'warum',
+      'retard',
+      'pourquoi',
+    ])
+  ) {
     if (!matchedProject) {
       return t('assistantNoInformation');
     }
@@ -588,20 +833,50 @@ function generateWorkspaceAnswer(
     ].join(' ');
   }
 
-  if (normalized.includes('decision')) {
-    const decisions = data.knowledgeItems.filter((item) => item.type.toLowerCase().includes('decision'));
+  if (includesAny(['decision', 'vendim', 'decisione', 'entscheidung', 'décision'])) {
+    const decisions = data.knowledgeItems.filter((item) =>
+      item.type.toLowerCase().includes('decision'),
+    );
     if (!decisions.length) {
       return t('assistantNoInformation');
     }
     return `${t('recentDecisions')}: ${decisions.map((item) => `${item.title} (${item.project})`).join('; ')}. ${t('assistantGroundingNote')}`;
   }
 
-  if (normalized.includes('risk') || normalized.includes('focus') || normalized.includes('week')) {
+  if (
+    includesAny([
+      'risk',
+      'focus',
+      'week',
+      'rrezik',
+      'fokusohet',
+      'javë',
+      'rischio',
+      'concentrarsi',
+      'settimana',
+      'risiko',
+      'konzentrieren',
+      'woche',
+      'risque',
+      'concentrer',
+      'semaine',
+    ])
+  ) {
     const riskSummary = data.risks.length
       ? data.risks.map((risk) => `${risk.title}: ${risk.mitigation}`).join('; ')
       : t('assistantNoRisksRecorded');
-    const projectSummary = data.projects.slice(0, 3).map((project) => `${project.name} (${project.status})`).join(', ');
+    const projectSummary = data.projects
+      .slice(0, 3)
+      .map((project) => `${project.name} (${project.status})`)
+      .join(', ');
     return `${t('managementFocus')}: ${projectSummary || t('assistantNoProjectsRecorded')}. ${riskSummary}. ${t('assistantGroundingNote')}`;
+  }
+
+  if (includesAny(['document', 'dokumenti', 'documento', 'dokument'])) {
+    const latestDocument = data.documents[0];
+    return latestDocument
+      ? `${t('document')}: ${latestDocument.title} (${latestDocument.type}, ${latestDocument.status}). ${t('assistantGroundingNote')}`
+      : t('assistantNoInformation');
   }
 
   if (recentActivity.length) {
@@ -622,13 +897,16 @@ function ProjectsView({
   onCreateProject: (input: { name: string; owner: string; summary: string }) => Promise<void>;
   t: (key: TranslationKey) => string;
 }) {
-  const [name, setName] = useState('New client launch');
-  const [owner, setOwner] = useState('Mira Chen');
-  const [summary, setSummary] = useState('Plan and track a new customer launch workspace.');
+  const [name, setName] = useState('');
+  const [owner, setOwner] = useState('');
+  const [summary, setSummary] = useState('');
 
   async function submitProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onCreateProject({ name, owner, summary });
+    setName('');
+    setOwner('');
+    setSummary('');
   }
 
   return (
@@ -638,48 +916,65 @@ function ProjectsView({
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_1.2fr_auto]">
           <input
             className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            aria-label={t('projectName')}
+            placeholder={t('projectNamePlaceholder')}
+            required
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
           <input
             className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            aria-label={t('projectOwner')}
+            placeholder={t('projectOwnerPlaceholder')}
+            required
             value={owner}
             onChange={(event) => setOwner(event.target.value)}
           />
           <input
             className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            aria-label={t('projectSummary')}
+            placeholder={t('projectSummaryPlaceholder')}
+            required
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
           />
-          <button className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white" type="submit">
+          <button
+            className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white"
+            type="submit"
+          >
             {t('create')}
           </button>
         </div>
       </form>
       <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       <div className="grid gap-4 lg:grid-cols-3">
-        {data.projects.length ? data.projects.map((project) => (
-          <div key={project.name} className="surface-panel rounded-ui p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {t('owner')}: {project.owner}
-                </p>
+        {data.projects.length ? (
+          data.projects.map((project) => (
+            <div key={project.name} className="surface-panel rounded-ui p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {t('owner')}: {project.owner}
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {project.status}
+                </span>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                {project.status}
-              </span>
+              <p className="mt-4 text-sm leading-6 text-slate-600">{project.summary}</p>
+              <div className="mt-4 h-2 rounded-full bg-slate-100">
+                <div
+                  className="h-2 rounded-full bg-teal"
+                  style={{ width: `${project.progress}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                {project.progress}% {t('complete')}
+              </p>
             </div>
-            <p className="mt-4 text-sm leading-6 text-slate-600">{project.summary}</p>
-            <div className="mt-4 h-2 rounded-full bg-slate-100">
-              <div className="h-2 rounded-full bg-teal" style={{ width: `${project.progress}%` }} />
-            </div>
-            <p className="mt-2 text-xs font-semibold text-slate-500">
-              {project.progress}% {t('complete')}
-            </p>
-          </div>
-        )) : (
+          ))
+        ) : (
           <EmptyState title={t('noProjectsTitle')} body={t('noProjectsBody')} />
         )}
       </div>
@@ -700,17 +995,16 @@ function KnowledgeView({
   setQuery: (query: string) => void;
   t: (key: TranslationKey) => string;
 }) {
-  const [title, setTitle] = useState('New customer decision');
+  const [title, setTitle] = useState('');
 
   async function submitKnowledge(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onCreateKnowledge(
-      {
-        title,
-        type: 'decision',
-        summary: 'A new decision was captured from the workspace.',
-      },
-    );
+    await onCreateKnowledge({
+      title,
+      type: 'decision',
+      summary: 'A new decision was captured from the workspace.',
+    });
+    setTitle('');
   }
 
   return (
@@ -733,26 +1027,34 @@ function KnowledgeView({
       <form className="mt-5 flex flex-wrap gap-3" onSubmit={submitKnowledge}>
         <input
           className="h-10 min-w-72 field-frame rounded-ui px-3 text-sm outline-none"
+          aria-label={t('knowledgeTitle')}
+          placeholder={t('knowledgeTitlePlaceholder')}
+          required
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-        <button className="h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
+        <button
+          className="h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
+          type="submit"
+        >
           {t('addKnowledge')}
         </button>
       </form>
       <div className="mt-5 grid gap-3">
-        {items.length ? items.map((item) => (
-          <div key={item.title} className="quiet-panel rounded-ui p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">
-                {item.type}
-              </span>
-              <span className="text-xs font-medium text-slate-500">{item.project}</span>
+        {items.length ? (
+          items.map((item) => (
+            <div key={item.title} className="quiet-panel rounded-ui p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">
+                  {item.type}
+                </span>
+                <span className="text-xs font-medium text-slate-500">{item.project}</span>
+              </div>
+              <h3 className="mt-3 text-base font-bold tracking-normal">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{item.summary}</p>
             </div>
-            <h3 className="mt-3 text-base font-bold tracking-normal">{item.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{item.summary}</p>
-          </div>
-        )) : (
+          ))
+        ) : (
           <EmptyState title={t('noKnowledgeTitle')} body={t('noKnowledgeBody')} />
         )}
       </div>
@@ -763,20 +1065,25 @@ function KnowledgeView({
 function DocumentsView({
   data,
   onCreateDocument,
-  showNotice,
+  onDownloadDocument,
   t,
 }: {
   data: WorkspaceData;
-  onCreateDocument: (input: { title: string; type: string }) => Promise<void>;
-  showNotice: (message: string) => void;
+  onCreateDocument: (input: { title: string; file: File }) => Promise<void>;
+  onDownloadDocument: (documentId: string, title: string) => Promise<void>;
   t: (key: TranslationKey) => string;
 }) {
-  const [title, setTitle] = useState('New uploaded document');
-  const [type, setType] = useState('PDF');
+  const [title, setTitle] = useState('');
+  const [file, setFile] = useState<File | null>(null);
 
   async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onCreateDocument({ title, type });
+    if (!file) {
+      return;
+    }
+    await onCreateDocument({ title: title || file.name.replace(/\.[^.]+$/, ''), file });
+    setTitle('');
+    setFile(null);
   }
 
   return (
@@ -791,6 +1098,9 @@ function DocumentsView({
                 <th className="px-4 py-3 font-semibold">{t('project')}</th>
                 <th className="px-4 py-3 font-semibold">{t('type')}</th>
                 <th className="px-4 py-3 font-semibold">{t('status')}</th>
+                <th className="px-4 py-3 font-semibold">
+                  <span className="sr-only">{t('action')}</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -800,6 +1110,19 @@ function DocumentsView({
                   <td className="px-4 py-3 text-slate-600">{document.project}</td>
                   <td className="px-4 py-3 text-slate-600">{document.type}</td>
                   <td className="px-4 py-3 text-slate-600">{document.status}</td>
+                  <td className="px-4 py-3 text-right">
+                    {document.status !== 'Metadata only' && !document.id.startsWith('demo-') ? (
+                      <button
+                        className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                        type="button"
+                        title={t('downloadDocument')}
+                        aria-label={t('downloadDocument')}
+                        onClick={() => onDownloadDocument(document.id, document.title)}
+                      >
+                        <Download size={16} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -814,33 +1137,28 @@ function DocumentsView({
       <form className="surface-panel rounded-ui p-5" onSubmit={submitDocument}>
         <Upload className="text-teal" size={24} aria-hidden="true" />
         <h3 className="mt-4 text-lg font-bold tracking-normal">{t('uploadDocument')}</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {t('documentUploadHelp')}
-        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t('documentUploadHelp')}</p>
         <input
           className="mt-4 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
+          placeholder={t('documentTitlePlaceholder')}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-        <select
-          className="mt-3 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
-          value={type}
-          onChange={(event) => setType(event.target.value)}
-        >
-          <option>PDF</option>
-          <option>DOCX</option>
-          <option>Markdown</option>
-          <option>TXT</option>
-        </select>
-        <button className="mt-4 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
-          {t('addDocument')}
-        </button>
+        <label className="secondary-action mt-3 flex min-h-20 cursor-pointer items-center justify-center rounded-ui px-4 py-3 text-center text-sm font-semibold">
+          <input
+            className="sr-only"
+            accept=".pdf,.docx,.txt,.md,.markdown"
+            type="file"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+          {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB` : t('selectFile')}
+        </label>
         <button
-          className="secondary-action ml-2 mt-4 h-10 rounded-ui px-4 text-sm font-semibold"
-          type="button"
-          onClick={() => showNotice(t('fileUploadLater'))}
+          className="mt-4 h-10 w-full primary-action rounded-ui px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!file}
+          type="submit"
         >
-          {t('selectFile')}
+          {t('uploadDocument')}
         </button>
       </form>
     </div>
@@ -854,16 +1172,23 @@ function IntegrationsView({
   showNotice: (message: string) => void;
   t: (key: TranslationKey) => string;
 }) {
-  const integrations = ['Gmail', 'Google Drive', 'Slack', 'GitHub', 'Notion', 'Jira', 'Microsoft Teams', 'Trello'];
+  const integrations = [
+    'Gmail',
+    'Google Drive',
+    'Slack',
+    'GitHub',
+    'Notion',
+    'Jira',
+    'Microsoft Teams',
+    'Trello',
+  ];
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {integrations.map((integration) => (
         <div key={integration} className="surface-panel rounded-ui p-5">
           <Plug className="text-signal" size={22} aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold tracking-normal">{integration}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {t('integrationPrepared')}
-          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t('integrationPrepared')}</p>
           <button
             className="secondary-action mt-4 h-9 rounded-ui px-3 text-sm font-semibold"
             type="button"
@@ -877,28 +1202,149 @@ function IntegrationsView({
   );
 }
 
-function TeamView({ data, t }: { data: WorkspaceData; t: (key: TranslationKey) => string }) {
+function TeamView({
+  data,
+  onCancelInvitation,
+  onInvite,
+  t,
+}: {
+  data: WorkspaceData;
+  onCancelInvitation: (invitationId: string) => Promise<void>;
+  onInvite: (input: { email: string; role: string }) => Promise<void>;
+  t: (key: TranslationKey) => string;
+}) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('Member');
+  const pendingInvitations = data.invitations ?? [];
+
+  async function copyInvitationLink(previewUrl: string) {
+    await navigator.clipboard.writeText(previewUrl);
+  }
+
+  async function submitInvitation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!email) {
+      return;
+    }
+    await onInvite({ email, role });
+    setEmail('');
+    setRole('Member');
+  }
+
   return (
-    <div className="surface-panel rounded-ui p-5">
-      <h2 className="text-2xl font-bold tracking-normal">{t('teamPermissions')}</h2>
-      <div className="mt-5 grid gap-3">
-        {data.users.length ? data.users.map((user) => (
-          <div
-            key={user.email}
-            className="flex flex-wrap items-center justify-between gap-3 quiet-panel rounded-ui p-4"
+    <div className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
+      <div className="surface-panel rounded-ui p-5">
+        <h2 className="text-2xl font-bold tracking-normal">{t('teamPermissions')}</h2>
+        <div className="mt-5 grid gap-3">
+          {data.users.length ? (
+            data.users.map((user) => (
+              <div
+                key={user.email}
+                className="flex flex-wrap items-center justify-between gap-3 quiet-panel rounded-ui p-4"
+              >
+                <div>
+                  <p className="font-bold text-slate-800">{user.name}</p>
+                  <p className="text-sm text-slate-500">{user.email}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">
+                    {user.role}
+                  </span>
+                  <LockKeyhole size={18} className="text-slate-400" aria-hidden="true" />
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyState title={t('noTeamTitle')} body={t('noTeamBody')} />
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-5">
+        <form className="surface-panel rounded-ui p-5" onSubmit={submitInvitation}>
+          <UserPlus className="text-teal" size={24} aria-hidden="true" />
+          <h2 className="mt-4 text-lg font-bold tracking-normal">{t('inviteTeamMember')}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t('inviteTeamMemberBody')}</p>
+          <label className="mt-4 block">
+            <span className="text-sm font-semibold text-slate-700">{t('email')}</span>
+            <span className="field-frame mt-2 flex h-11 items-center gap-2 rounded-ui px-3">
+              <Mail size={17} className="text-slate-400" aria-hidden="true" />
+              <input
+                className="w-full border-0 bg-transparent text-sm outline-none"
+                placeholder="new.member@company.com"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </span>
+          </label>
+          <label className="mt-4 block">
+            <span className="text-sm font-semibold text-slate-700">{t('role')}</span>
+            <select
+              className="field-frame mt-2 h-11 w-full rounded-ui px-3 text-sm outline-none"
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+            >
+              {['Administrator', 'Manager', 'Member', 'Viewer'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="primary-action mt-5 inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
+            type="submit"
           >
-            <div>
-              <p className="font-bold text-slate-800">{user.name}</p>
-              <p className="text-sm text-slate-500">{user.email}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">{user.role}</span>
-              <LockKeyhole size={18} className="text-slate-400" aria-hidden="true" />
-            </div>
+            <UserPlus size={16} aria-hidden="true" />
+            {t('sendInvite')}
+          </button>
+        </form>
+
+        <div className="surface-panel rounded-ui p-5">
+          <h2 className="text-lg font-bold tracking-normal">{t('pendingInvitations')}</h2>
+          <div className="mt-4 grid gap-3">
+            {pendingInvitations.length ? (
+              pendingInvitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="quiet-panel flex items-center justify-between gap-3 rounded-ui p-4"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{invitation.email}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {invitation.role} · {t('expires')}{' '}
+                      {new Date(invitation.expiresAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {invitation.previewUrl ? (
+                      <button
+                        className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                        type="button"
+                        title={t('copyInvitationLink')}
+                        aria-label={t('copyInvitationLink')}
+                        onClick={() => copyInvitationLink(invitation.previewUrl!)}
+                      >
+                        <Copy size={16} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                    <button
+                      className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                      type="button"
+                      aria-label={t('cancelInvitation')}
+                      onClick={() => onCancelInvitation(invitation.id)}
+                    >
+                      <X size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState title={t('noInvitationsTitle')} body={t('noInvitationsBody')} />
+            )}
           </div>
-        )) : (
-          <EmptyState title={t('noTeamTitle')} body={t('noTeamBody')} />
-        )}
+        </div>
       </div>
     </div>
   );
@@ -909,15 +1355,17 @@ function ActivityView({ data, t }: { data: WorkspaceData; t: (key: TranslationKe
     <div className="surface-panel rounded-ui p-5">
       <h2 className="text-2xl font-bold tracking-normal">{t('activityTimeline')}</h2>
       <div className="mt-5 grid gap-3">
-        {data.activities.length ? data.activities.map((item) => (
-          <div key={`${item.actor}-${item.target}`} className="quiet-panel rounded-ui p-4">
-            <p className="text-sm font-semibold text-slate-800">
-              {item.actor} {item.action}
-            </p>
-            <p className="mt-1 text-sm text-slate-600">{item.target}</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">{item.time}</p>
-          </div>
-        )) : (
+        {data.activities.length ? (
+          data.activities.map((item) => (
+            <div key={`${item.actor}-${item.target}`} className="quiet-panel rounded-ui p-4">
+              <p className="text-sm font-semibold text-slate-800">
+                {item.actor} {item.action}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">{item.target}</p>
+              <p className="mt-2 text-xs font-semibold text-slate-500">{item.time}</p>
+            </div>
+          ))
+        ) : (
           <EmptyState title={t('noActivityTitle')} body={t('noActivityBody')} />
         )}
       </div>
@@ -942,8 +1390,10 @@ function ProfileView({
         <UserCircle className="text-teal" size={42} aria-hidden="true" />
         <h2 className="mt-4 text-2xl font-bold tracking-normal">{currentUser.name}</h2>
         <p className="mt-1 text-sm text-slate-500">{currentUser.email}</p>
-        <p className="mt-4 rounded-full bg-teal/10 px-3 py-1 text-sm font-semibold text-teal">{currentUser.role}</p>
-        <p className="mt-4 text-sm leading-6 text-slate-600">{currentUser.focus}</p>
+        <p className="mt-4 rounded-full bg-teal/10 px-3 py-1 text-sm font-semibold text-teal">
+          {currentUser.role}
+        </p>
+        <p className="mt-4 text-sm leading-6 text-slate-600">{t('profileAccessDescription')}</p>
       </div>
       <form
         className="surface-panel rounded-ui p-5"
@@ -969,9 +1419,14 @@ function ProfileView({
             value={currentUser.email}
             readOnly
           />
-          <span className="mt-2 block text-xs font-medium text-slate-500">{t('emailChangeLater')}</span>
+          <span className="mt-2 block text-xs font-medium text-slate-500">
+            {t('emailChangeLater')}
+          </span>
         </label>
-        <button className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
+        <button
+          className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
+          type="submit"
+        >
           {t('saveChanges')}
         </button>
       </form>
@@ -1020,7 +1475,10 @@ function SettingsView({
             onChange={(event) => setIndustry(event.target.value)}
           />
         </label>
-        <button className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white" type="submit">
+        <button
+          className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
+          type="submit"
+        >
           {t('saveChanges')}
         </button>
       </div>
@@ -1034,9 +1492,9 @@ function SettingsView({
             value={aiProvider}
             onChange={(event) => setAiProvider(event.target.value)}
           >
-            <option value="mock">Mock local assistant</option>
-            <option value="openai">OpenAI ready</option>
-            <option value="custom">Custom provider</option>
+            <option value="mock">{t('mockLocalAssistant')}</option>
+            <option value="openai">{t('openAiReady')}</option>
+            <option value="custom">{t('customProvider')}</option>
           </select>
         </div>
         <div className="surface-panel rounded-ui p-5">
@@ -1102,22 +1560,30 @@ function ProjectTable({
   );
 }
 
-function RiskPanel({ risks, t }: { risks: WorkspaceData['risks']; t: (key: TranslationKey) => string }) {
+function RiskPanel({
+  risks,
+  t,
+}: {
+  risks: WorkspaceData['risks'];
+  t: (key: TranslationKey) => string;
+}) {
   return (
     <div className="surface-panel rounded-ui p-5">
       <h2 className="text-lg font-bold tracking-normal">{t('currentRisks')}</h2>
       <div className="mt-4 grid gap-3">
-        {risks.length ? risks.map((risk) => (
-          <div key={risk.title} className="quiet-panel rounded-ui p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-bold text-slate-800">{risk.title}</p>
-              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                {risk.severity}
-              </span>
+        {risks.length ? (
+          risks.map((risk) => (
+            <div key={risk.title} className="quiet-panel rounded-ui p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-800">{risk.title}</p>
+                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                  {risk.severity}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{risk.mitigation}</p>
             </div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{risk.mitigation}</p>
-          </div>
-        )) : (
+          ))
+        ) : (
           <EmptyState title={t('noRisksTitle')} body={t('noRisksBody')} />
         )}
       </div>
