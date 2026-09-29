@@ -79,6 +79,7 @@ export function PricingPage() {
         </p>
         <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-normal">{t('pricingTitle')}</h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">{t('pricingBody')}</p>
+        <p className="mt-3 text-sm font-semibold text-teal">{t('noPaymentRequired')}</p>
 
         <div className="mt-8 grid gap-5 lg:grid-cols-3">
           {plans.map((plan) => (

@@ -9,8 +9,8 @@
 | Authentication and sessions    | In progress | P0       | High       | 2              |
 | Organizations and permissions  | In progress | P0       | High       | 2              |
 | Projects and knowledge items   | In progress | P0       | High       | 3              |
-| Documents and processing       | Planned     | P0       | High       | 4              |
-| Hybrid search and AI assistant | Planned     | P0       | Very high  | 5              |
+| Documents and processing       | In progress | P0       | High       | 4              |
+| Hybrid search and AI assistant | In progress | P0       | Very high  | 5              |
 | Demo-ready UI                  | In progress | P0       | High       | 6              |
 | Testing and deployment         | Planned     | P0       | High       | 7              |
 | First real integration         | Planned     | P1       | High       | After MVP core |
@@ -25,7 +25,7 @@
 | As an administrator, I want to invite members, so that my team can collaborate.                                   | Invite email, role assignment, expiry, cancellation, and activity event.                            | Orgs               | P0       | Medium     | 2         | In progress |
 | As a manager, I want to create projects, so that company context is organized.                                    | CRUD, archive, status, timeline, members.                                                           | Orgs               | P0       | Medium     | 3         | In progress |
 | As an employee, I want to add decisions and notes, so that context is not lost.                                   | Knowledge item types, tags, permissions, project link.                                              | Projects           | P0       | Medium     | 3         | In progress |
-| As an employee, I want to upload documents, so that they become searchable.                                       | File validation, storage, metadata, processing status.                                              | Knowledge          | P0       | High       | 4         | Planned     |
+| As an employee, I want to upload documents, so that they become searchable.                                       | File validation, storage, extraction, chunks, processing status, retry, and keyword search.         | Knowledge          | P0       | High       | 4         | In progress |
 | As a manager, I want to ask why a project is delayed, so that I can act faster.                                   | Answer uses authorized sources, citations, limits, related records.                                 | Search/docs        | P0       | Very high  | 5         | Planned     |
 | As an owner, I want a dashboard of risks and priorities, so that I know what to focus on.                         | Active projects, risks, recent decisions, documents, suggested priorities.                          | Projects/knowledge | P0       | Medium     | 6         | In progress |
 | As an administrator, I want to see integration options, so that I understand future data sources.                 | Mock catalog, provider states, sync architecture copy.                                              | Foundation         | P1       | Low        | 6         | In progress |
@@ -152,34 +152,39 @@ Acceptance criteria:
 - Existing and new users can accept single-use, expiring invitations through a dedicated page.
 - Users with multiple memberships can switch organizations from the application header.
 - Authenticated requests now reject revoked or expired backing sessions.
+- Email verification and password reset now use hashed, expiring, single-use action tokens with local preview links and translated screens.
+- Password reset revokes every active session, and JWT handling now uses the audited `jsonwebtoken` library.
 - Real document uploads and authorized downloads work against MinIO/S3-compatible storage.
-- TXT and Markdown documents become searchable immediately; PDF and DOCX show an extraction-pending state.
+- TXT and Markdown documents become searchable immediately; PDF and DOCX are extracted by a retryable BullMQ worker.
+- Document text is normalized into overlapping tenant-scoped chunks with deterministic local summaries.
+- Authorized document content search returns ranked excerpts and source downloads from the active tenant only.
+- The Documents page polls active processing jobs and exposes visible failure details and a retry action.
+- Live verification covered TXT extraction/search and real DOCX queue processing against local MongoDB, Redis, and MinIO.
+- Project and knowledge-item edit/archive actions now persist through production APIs and respect role-based read-only states.
+- Document mutations reject Viewer accounts and document downloads are scoped directly to the active tenant.
+- Tenant-isolation regression tests cover project, knowledge, and document query boundaries.
+- Public and application routes are code-split, with Three.js isolated from the initial application bundle.
+- The development launcher selects free ports automatically and leaves unrelated local applications untouched.
+- NestJS dependencies and upload middleware were updated to patched versions; the dependency audit reports zero known vulnerabilities.
 
 ## Still To Do Next
 
-- Replace temporary token helper with a standard audited JWT library before production hardening.
-- Add email verification and password reset flows.
 - Add an internal admin review screen for demo requests and manual demo workspace creation.
 - Enforce demo account expiration in authentication/session validation once demo accounts are created by the team.
-- Connect production email delivery for invitation links.
-- Add PDF/DOCX extraction, document chunks, background processing, and a production malware-scanning provider.
-- Add ownership/resource-level permission rules beyond basic role membership.
-- Connect all dashboard data to production API modules instead of demo endpoints.
-- Replace localStorage profile updates with API-backed user profile updates.
+- Connect production email delivery for invitation, verification, and password-reset links.
+- Add a production malware-scanning provider before accepting untrusted public uploads.
+- Add item-level ownership and resource-sharing rules beyond role membership.
+- Connect all dashboard risks, priorities, unanswered questions, and overdue data to production API modules.
 - Translate seeded demo business records or add localized demo datasets if the product demo needs fully localized sample content.
-- Add automated browser regression checks for translation switching and 3D canvas rendering.
-- Add document upload and processing pipeline.
-- Add hybrid search and source-grounded AI retrieval.
+- Add automated browser regression checks for authentication, CRUD, translation switching, permissions, and 3D canvas rendering.
+- Add semantic embeddings and merge vector ranking with the implemented document keyword search.
+- Add source-grounded AI retrieval and citation validation.
 
 ## Recommended Next Sprint
 
-Implement the production documents slice:
+Complete production dashboard data and begin grounded retrieval:
 
-- Document schema and DTOs.
-- Authenticated document metadata endpoints.
-- Local file upload validation for PDF, DOCX, TXT, and Markdown.
-- Object-storage abstraction with local MinIO support.
-- Background document-processing job skeleton.
-- Text extraction placeholders with explicit processing status.
-- Connect the Documents page to production endpoints for real accounts.
-- Add integration tests for tenant isolation and file validation.
+- Add production risks, overdue work, unanswered questions, and suggested-priority endpoints.
+- Replace remaining dashboard sample panels with API data and honest empty states.
+- Add a provider-independent embedding interface and hybrid ranking tests.
+- Add browser regression tests for login, all-role permissions, CRUD, translations, and the 3D canvas.

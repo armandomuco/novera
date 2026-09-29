@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   PayloadTooLargeException,
@@ -15,18 +16,26 @@ import { AuthContext } from '../auth/auth.types';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { Project } from '../projects/projects.schemas';
 import { DocumentStorageService } from './document-storage.service';
-import { CreateDocumentDto, UploadDocumentDto } from './documents.dto';
+import { DocumentChunk } from './document-chunks.schemas';
+import { DocumentProcessingQueue } from './document-processing.queue';
+import { DocumentProcessorService } from './document-processor.service';
+import { CreateDocumentDto, SearchDocumentsDto, UploadDocumentDto } from './documents.dto';
 import { Document } from './documents.schemas';
+
+const writeRoles = new Set(['Owner', 'Administrator', 'Manager', 'Member']);
 
 @Injectable()
 export class DocumentsService {
   constructor(
     @InjectModel(Document.name) private readonly documentModel: Model<Document>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    @InjectModel(DocumentChunk.name) private readonly chunkModel: Model<DocumentChunk>,
     private readonly organizationsService: OrganizationsService,
     private readonly activityService: ActivityService,
     private readonly storageService: DocumentStorageService,
     private readonly configService: ConfigService,
+    private readonly processor: DocumentProcessorService,
+    private readonly processingQueue: DocumentProcessingQueue,
   ) {}
 
   async list(auth: AuthContext, organizationId?: string) {
@@ -40,6 +49,7 @@ export class DocumentsService {
   }
 
   async create(auth: AuthContext, body: CreateDocumentDto) {
+    this.requireWriteRole(auth);
     const tenantId = body.organizationId ?? auth.organizationId;
     await this.organizationsService.requireMembership(auth, tenantId);
     if (body.projectId) {
@@ -72,6 +82,7 @@ export class DocumentsService {
   }
 
   async upload(auth: AuthContext, body: UploadDocumentDto, file?: Express.Multer.File) {
+    this.requireWriteRole(auth);
     if (!file) {
       throw new BadRequestException('A document file is required.');
     }
@@ -89,9 +100,6 @@ export class DocumentsService {
     const storageKey = `${tenantId}/${documentId.toString()}/${safeFileName}`;
     const checksumSha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
     const isText = documentType === 'TXT' || documentType === 'Markdown';
-    const searchableText = isText
-      ? file.buffer.toString('utf8').replace(/\0/g, '').slice(0, 2_000_000)
-      : '';
 
     const document = await this.documentModel.create({
       _id: documentId,
@@ -101,17 +109,16 @@ export class DocumentsService {
       type: documentType,
       source: 'File upload',
       status: 'Uploading',
-      searchableText,
-      aiSummary: isText
-        ? 'Text extracted. AI summary generation is pending.'
-        : 'File stored. Text extraction is pending.',
+      searchableText: '',
+      aiSummary: 'File stored. Text extraction is pending.',
       storageKey,
       originalFileName: file.originalname,
       mimeType: file.mimetype || 'application/octet-stream',
       sizeBytes: file.size,
       checksumSha256,
       processingError: null,
-      extractedAt: isText ? new Date() : null,
+      extractedAt: null,
+      chunkCount: 0,
       createdBy: userId,
       updatedBy: userId,
       deletedAt: null,
@@ -119,13 +126,36 @@ export class DocumentsService {
 
     try {
       await this.storageService.put(storageKey, file.buffer, document.mimeType ?? file.mimetype);
-      document.status = isText ? 'Text extracted' : 'Extraction pending';
-      await document.save();
     } catch (error) {
       document.status = 'Upload failed';
       document.processingError = error instanceof Error ? error.message : 'Storage upload failed.';
       await document.save();
       throw error;
+    }
+    if (isText) {
+      try {
+        await this.processor.processText(
+          document._id,
+          document.organizationId,
+          file.buffer.toString('utf8'),
+        );
+      } catch (error) {
+        await this.processor.markFailed(document._id.toString(), tenantId, error);
+      }
+    } else {
+      document.status = 'Processing queued';
+      await document.save();
+      try {
+        await this.processingQueue.enqueue({
+          documentId: document._id.toString(),
+          organizationId: tenantId,
+        });
+      } catch (error) {
+        document.status = 'Queue unavailable';
+        document.processingError =
+          error instanceof Error ? error.message.slice(0, 500) : 'Processing queue unavailable.';
+        await document.save();
+      }
     }
 
     await this.activityService.record(auth, {
@@ -140,20 +170,104 @@ export class DocumentsService {
         projectId: body.projectId ?? null,
       },
     });
+    const updated = await this.documentModel.findById(document._id).lean();
+    return { data: this.toResponse(updated ?? document.toObject()) };
+  }
+
+  async reprocess(auth: AuthContext, documentId: string) {
+    this.requireWriteRole(auth);
+    if (!Types.ObjectId.isValid(documentId)) throw new NotFoundException('Document not found.');
+    await this.organizationsService.requireMembership(auth, auth.organizationId);
+    const document = await this.documentModel.findOne({
+      _id: new Types.ObjectId(documentId),
+      organizationId: new Types.ObjectId(auth.organizationId),
+      deletedAt: null,
+      storageKey: { $ne: null },
+    });
+    if (!document) throw new NotFoundException('Document file not found.');
+    document.status = 'Processing queued';
+    document.processingError = null;
+    await document.save();
+    try {
+      await this.processingQueue.enqueue({
+        documentId: document._id.toString(),
+        organizationId: auth.organizationId,
+      });
+    } catch (error) {
+      document.status = 'Queue unavailable';
+      document.processingError =
+        error instanceof Error ? error.message.slice(0, 500) : 'Processing queue unavailable.';
+      await document.save();
+    }
     return { data: this.toResponse(document.toObject()) };
+  }
+
+  async search(auth: AuthContext, query: SearchDocumentsDto) {
+    await this.organizationsService.requireMembership(auth, auth.organizationId);
+    if (query.projectId) await this.requireProjectInTenant(auth.organizationId, query.projectId);
+    const terms = query.query
+      .trim()
+      .split(/\s+/)
+      .map((term) => term.replace(/[^\p{L}\p{N}_-]/gu, ''))
+      .filter(Boolean)
+      .slice(0, 12);
+    if (!terms.length) throw new BadRequestException('Search query must contain searchable text.');
+    const organizationId = new Types.ObjectId(auth.organizationId);
+    const chunks = await this.chunkModel
+      .find(
+        {
+          organizationId,
+          ...(query.projectId ? { projectId: new Types.ObjectId(query.projectId) } : {}),
+          $text: { $search: terms.join(' ') },
+        },
+        { score: { $meta: 'textScore' } },
+      )
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(20)
+      .lean();
+    const documentIds = [...new Set(chunks.map((chunk) => chunk.documentId.toString()))].map(
+      (id) => new Types.ObjectId(id),
+    );
+    const documents = await this.documentModel
+      .find({ _id: { $in: documentIds }, organizationId, deletedAt: null })
+      .lean();
+    const documentsById = new Map(documents.map((document) => [document._id.toString(), document]));
+    return {
+      data: chunks.flatMap((chunk) => {
+        const document = documentsById.get(chunk.documentId.toString());
+        return document
+          ? [
+              {
+                documentId: document._id.toString(),
+                title: document.title,
+                type: document.type,
+                projectId: document.projectId?.toString() ?? null,
+                chunkIndex: chunk.chunkIndex,
+                excerpt: chunk.content.slice(0, 500),
+                score: (chunk as unknown as { score?: number }).score ?? null,
+                sourceUrl: `/api/v1/documents/${document._id.toString()}/download`,
+              },
+            ]
+          : [];
+      }),
+    };
   }
 
   async download(auth: AuthContext, documentId: string) {
     if (!Types.ObjectId.isValid(documentId)) {
       throw new NotFoundException('Document not found.');
     }
+    await this.organizationsService.requireMembership(auth, auth.organizationId);
     const document = await this.documentModel
-      .findOne({ _id: new Types.ObjectId(documentId), deletedAt: null })
+      .findOne({
+        _id: new Types.ObjectId(documentId),
+        organizationId: new Types.ObjectId(auth.organizationId),
+        deletedAt: null,
+      })
       .lean();
     if (!document?.storageKey) {
       throw new NotFoundException('Document file not found.');
     }
-    await this.organizationsService.requireMembership(auth, document.organizationId.toString());
     const stored = await this.storageService.get(document.storageKey);
     if (!stored.Body) {
       throw new NotFoundException('Document file not found.');
@@ -179,6 +293,12 @@ export class DocumentsService {
     }
   }
 
+  private requireWriteRole(auth: AuthContext) {
+    if (!writeRoles.has(auth.role)) {
+      throw new ForbiddenException('You do not have permission to change documents.');
+    }
+  }
+
   private toResponse(document: Document & { createdAt?: Date; updatedAt?: Date }) {
     return {
       id: document._id.toString(),
@@ -193,6 +313,8 @@ export class DocumentsService {
       mimeType: document.mimeType ?? null,
       sizeBytes: document.sizeBytes ?? null,
       checksumSha256: document.checksumSha256 ?? null,
+      processingError: document.processingError ?? null,
+      chunkCount: document.chunkCount ?? 0,
       extractedAt: document.extractedAt?.toISOString() ?? null,
       createdAt: document.createdAt?.toISOString() ?? null,
       updatedAt: document.updatedAt?.toISOString() ?? null,

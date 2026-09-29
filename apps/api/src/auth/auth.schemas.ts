@@ -122,17 +122,39 @@ export class AuthInvitation {
   cancelledAt?: Date | null;
 }
 
+@Schema({ collection: 'authActionTokens', timestamps: true })
+export class AuthActionToken {
+  _id!: Types.ObjectId;
+
+  @Prop({ required: true, index: true })
+  userId!: Types.ObjectId;
+
+  @Prop({ required: true, enum: ['verify_email', 'password_reset'] })
+  type!: 'verify_email' | 'password_reset';
+
+  @Prop({ required: true, unique: true })
+  tokenHash!: string;
+
+  @Prop({ required: true })
+  expiresAt!: Date;
+
+  @Prop({ type: Date, default: null })
+  usedAt?: Date | null;
+}
+
 export type AuthUserDocument = HydratedDocument<AuthUser>;
 export type AuthOrganizationDocument = HydratedDocument<AuthOrganization>;
 export type AuthOrganizationMemberDocument = HydratedDocument<AuthOrganizationMember>;
 export type AuthSessionDocument = HydratedDocument<AuthSession>;
 export type AuthInvitationDocument = HydratedDocument<AuthInvitation>;
+export type AuthActionTokenDocument = HydratedDocument<AuthActionToken>;
 
 export const AuthUserSchema = SchemaFactory.createForClass(AuthUser);
 export const AuthOrganizationSchema = SchemaFactory.createForClass(AuthOrganization);
 export const AuthOrganizationMemberSchema = SchemaFactory.createForClass(AuthOrganizationMember);
 export const AuthSessionSchema = SchemaFactory.createForClass(AuthSession);
 export const AuthInvitationSchema = SchemaFactory.createForClass(AuthInvitation);
+export const AuthActionTokenSchema = SchemaFactory.createForClass(AuthActionToken);
 
 AuthOrganizationMemberSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 AuthInvitationSchema.index(
@@ -140,3 +162,5 @@ AuthInvitationSchema.index(
   { unique: true, partialFilterExpression: { status: 'pending' } },
 );
 AuthInvitationSchema.index({ tokenHash: 1 }, { unique: true });
+AuthActionTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+AuthActionTokenSchema.index({ userId: 1, type: 1, usedAt: 1 });

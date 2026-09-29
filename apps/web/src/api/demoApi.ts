@@ -17,6 +17,17 @@ export type ApiUser = {
   password?: string;
 };
 
+export type WorkspaceDocument = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  project: string;
+  updated: string;
+  processingError?: string | null;
+  chunkCount?: number;
+};
+
 export type WorkspaceData = {
   organization: {
     id?: string;
@@ -42,7 +53,7 @@ export type WorkspaceData = {
   }>;
   projects: typeof projects;
   knowledgeItems: typeof knowledgeItems;
-  documents: typeof documents;
+  documents: WorkspaceDocument[];
   risks: typeof risks;
   activities: typeof activities;
   source: 'api' | 'fallback';

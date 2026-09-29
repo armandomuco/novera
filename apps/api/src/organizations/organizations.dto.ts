@@ -31,8 +31,7 @@ export class UpdateOrganizationDto {
   industry?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(80)
+  @IsIn(['mock'])
   aiProvider?: string;
 }
 

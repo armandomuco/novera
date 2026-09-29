@@ -26,8 +26,11 @@ status_service() {
 status_service "api"
 status_service "web"
 
+API_PORT="$(cat "$PID_DIR/api.port" 2>/dev/null || echo 4000)"
+WEB_PORT="$(cat "$PID_DIR/web.port" 2>/dev/null || echo 5173)"
+
 echo
 echo "Useful URLs:"
-echo "API health: http://localhost:4000/api/v1/health"
-echo "Swagger: http://localhost:4000/api/docs"
-echo "Web: http://localhost:5173"
+echo "API health: http://localhost:$API_PORT/api/v1/health"
+echo "Swagger: http://localhost:$API_PORT/api/docs"
+echo "Web: http://localhost:$WEB_PORT"

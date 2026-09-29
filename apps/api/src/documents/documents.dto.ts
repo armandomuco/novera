@@ -36,3 +36,14 @@ export class UploadDocumentDto {
   @MaxLength(180)
   title?: string;
 }
+
+export class SearchDocumentsDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  query!: string;
+
+  @IsOptional()
+  @IsMongoId()
+  projectId?: string;
+}

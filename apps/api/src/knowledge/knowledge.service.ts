@@ -30,6 +30,9 @@ export class KnowledgeService {
       deletedAt: null,
     };
     if (filters.projectId) {
+      if (!Types.ObjectId.isValid(filters.projectId)) {
+        throw new NotFoundException('Project not found.');
+      }
       query.projectId = new Types.ObjectId(filters.projectId);
     }
     if (filters.type) {
@@ -138,11 +141,17 @@ export class KnowledgeService {
     if (!Types.ObjectId.isValid(itemId)) {
       throw new NotFoundException('Knowledge item not found.');
     }
-    const item = await this.knowledgeModel.findOne({ _id: itemId, deletedAt: null }).lean();
+    await this.organizationsService.requireMembership(auth, auth.organizationId);
+    const item = await this.knowledgeModel
+      .findOne({
+        _id: new Types.ObjectId(itemId),
+        organizationId: new Types.ObjectId(auth.organizationId),
+        deletedAt: null,
+      })
+      .lean();
     if (!item) {
       throw new NotFoundException('Knowledge item not found.');
     }
-    await this.organizationsService.requireMembership(auth, item.organizationId.toString());
     return item;
   }
 

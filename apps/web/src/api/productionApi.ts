@@ -54,6 +54,19 @@ type ApiDocument = {
   status: string;
   projectId: string | null;
   updatedAt: string | null;
+  processingError: string | null;
+  chunkCount: number;
+};
+
+export type DocumentSearchResult = {
+  documentId: string;
+  title: string;
+  type: string;
+  projectId: string | null;
+  chunkIndex: number;
+  excerpt: string;
+  score: number | null;
+  sourceUrl: string;
 };
 
 type ApiMember = {
@@ -76,9 +89,8 @@ type ApiInvitation = {
 
 type ApiOrganizationMembership = ApiOrganization & { role: string };
 
-export function hasProductionSession() {
-  const auth = getStoredAuth();
-  return Boolean(auth && !auth.user.email.endsWith('@novera.test'));
+export function hasAuthenticatedSession() {
+  return Boolean(getStoredAuth());
 }
 
 export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
@@ -140,6 +152,8 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
         ? (projectNameById.get(document.projectId) ?? 'Unassigned')
         : 'Unassigned',
       updated: document.updatedAt ? new Date(document.updatedAt).toLocaleString() : 'Recently',
+      processingError: document.processingError,
+      chunkCount: document.chunkCount,
     })),
     risks: risks.slice(0, 0),
     activities: activityEvents.data.map((event) => ({
@@ -202,6 +216,23 @@ export async function createProductionProject(input: {
   return fetchProductionWorkspace();
 }
 
+export async function updateProductionProject(
+  projectId: string,
+  input: { name: string; owner: string; summary: string },
+): Promise<WorkspaceData> {
+  await requestMutation(`/api/v1/projects/${projectId}`, 'PATCH', {
+    name: input.name,
+    ownerName: input.owner,
+    description: input.summary,
+  });
+  return fetchProductionWorkspace();
+}
+
+export async function archiveProductionProject(projectId: string): Promise<WorkspaceData> {
+  await requestMutation(`/api/v1/projects/${projectId}`, 'DELETE');
+  return fetchProductionWorkspace();
+}
+
 export async function createProductionKnowledgeItem(input: {
   title: string;
   type: string;
@@ -214,6 +245,23 @@ export async function createProductionKnowledgeItem(input: {
     content: input.summary,
     tags: ['manual'],
   });
+  return fetchProductionWorkspace();
+}
+
+export async function updateProductionKnowledgeItem(
+  itemId: string,
+  input: { title: string; type: string; summary: string },
+): Promise<WorkspaceData> {
+  await requestMutation(`/api/v1/knowledge-items/${itemId}`, 'PATCH', {
+    title: input.title,
+    type: normalizeKnowledgeType(input.type),
+    content: input.summary,
+  });
+  return fetchProductionWorkspace();
+}
+
+export async function archiveProductionKnowledgeItem(itemId: string): Promise<WorkspaceData> {
+  await requestMutation(`/api/v1/knowledge-items/${itemId}`, 'DELETE');
   return fetchProductionWorkspace();
 }
 
@@ -247,6 +295,23 @@ export async function downloadProductionDocument(documentId: string, fileName: s
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
+export async function searchProductionDocuments(query: string) {
+  const response = await get<ApiResponse<DocumentSearchResult[]>>(
+    `/api/v1/documents/search?query=${encodeURIComponent(query)}`,
+  );
+  return response.data;
+}
+
+export async function reprocessProductionDocument(documentId: string): Promise<WorkspaceData> {
+  const response = await authenticatedFetch(`/api/v1/documents/${documentId}/reprocess`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Document reprocessing failed: ${response.status}`);
+  }
+  return fetchProductionWorkspace();
 }
 
 export async function updateProductionOrganization(input: {
@@ -288,6 +353,20 @@ async function mutation<T = void>(path: string, body: Record<string, unknown>): 
   }
   const payload = (await response.json()) as ApiResponse<T>;
   return payload.data;
+}
+
+async function requestMutation(
+  path: string,
+  method: 'PATCH' | 'DELETE',
+  body?: Record<string, unknown>,
+) {
+  const response = await authenticatedFetch(path, {
+    method,
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    throw new Error(`Mutation failed: ${response.status}`);
+  }
 }
 
 function normalizeKnowledgeType(type: string) {

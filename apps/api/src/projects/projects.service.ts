@@ -121,11 +121,17 @@ export class ProjectsService {
     if (!Types.ObjectId.isValid(projectId)) {
       throw new NotFoundException('Project not found.');
     }
-    const project = await this.projectModel.findOne({ _id: projectId, deletedAt: null }).lean();
+    await this.organizationsService.requireMembership(auth, auth.organizationId);
+    const project = await this.projectModel
+      .findOne({
+        _id: new Types.ObjectId(projectId),
+        organizationId: new Types.ObjectId(auth.organizationId),
+        deletedAt: null,
+      })
+      .lean();
     if (!project) {
       throw new NotFoundException('Project not found.');
     }
-    await this.organizationsService.requireMembership(auth, project.organizationId.toString());
     return project;
   }
 

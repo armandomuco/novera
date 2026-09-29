@@ -3,6 +3,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import {
+  AuthActionToken,
+  AuthActionTokenSchema,
   AuthOrganization,
   AuthOrganizationMember,
   AuthOrganizationMemberSchema,
@@ -24,6 +26,7 @@ import { AuthService } from './auth.service';
       { name: AuthOrganizationMember.name, schema: AuthOrganizationMemberSchema },
       { name: AuthSession.name, schema: AuthSessionSchema },
       { name: AuthInvitation.name, schema: AuthInvitationSchema },
+      { name: AuthActionToken.name, schema: AuthActionTokenSchema },
     ]),
   ],
   controllers: [AuthController],

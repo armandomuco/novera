@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  Archive,
   Bot,
   Building2,
   CheckCircle2,
@@ -13,7 +14,9 @@ import {
   LogOut,
   Mail,
   Menu,
+  Pencil,
   Plug,
+  Save,
   Search,
   Settings,
   ShieldCheck,
@@ -23,28 +26,35 @@ import {
   UserPlus,
   Users,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clearAuth, switchOrganization, updateCurrentUser } from '../api/authApi';
 import {
-  createDemoKnowledgeItem,
-  createDemoProject,
-  fetchWorkspace,
-  ApiUser,
-  WorkspaceData,
-} from '../api/demoApi';
+  clearAuth,
+  requestEmailVerification,
+  switchOrganization,
+  updateCurrentUser,
+} from '../api/authApi';
+import { ApiUser, WorkspaceData } from '../api/demoApi';
 import {
+  archiveProductionKnowledgeItem,
+  archiveProductionProject,
   cancelProductionInvitation,
   createProductionInvitation,
   createProductionKnowledgeItem,
   createProductionProject,
   fetchProductionWorkspace,
-  hasProductionSession,
+  hasAuthenticatedSession,
   downloadProductionDocument,
+  reprocessProductionDocument,
+  searchProductionDocuments,
   uploadProductionDocument,
+  updateProductionKnowledgeItem,
   updateProductionOrganization,
+  updateProductionProject,
 } from '../api/productionApi';
+import type { DocumentSearchResult } from '../api/productionApi';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
@@ -105,7 +115,7 @@ export function AppShell() {
 
   useEffect(() => {
     let isMounted = true;
-    if (!hasProductionSession()) {
+    if (!hasAuthenticatedSession()) {
       window.localStorage.removeItem('novera-demo-user');
       navigate('/login');
       return () => {
@@ -113,8 +123,7 @@ export function AppShell() {
       };
     }
     setIsLoadingWorkspace(true);
-    const workspaceRequest = hasProductionSession() ? fetchProductionWorkspace() : fetchWorkspace();
-    workspaceRequest
+    fetchProductionWorkspace()
       .then((data) => {
         if (isMounted) {
           setWorkspace(data);
@@ -156,6 +165,30 @@ export function AppShell() {
     activities,
     source: 'fallback' as const,
   };
+
+  const hasDocumentsProcessing = Boolean(
+    workspace?.documents.some((document) =>
+      ['Processing queued', 'Processing', 'Uploading'].includes(document.status),
+    ),
+  );
+
+  useEffect(() => {
+    if (!hasDocumentsProcessing) {
+      return;
+    }
+    let isMounted = true;
+    const timer = window.setInterval(() => {
+      fetchProductionWorkspace()
+        .then((data) => {
+          if (isMounted) setWorkspace(data);
+        })
+        .catch(() => undefined);
+    }, 2500);
+    return () => {
+      isMounted = false;
+      window.clearInterval(timer);
+    };
+  }, [hasDocumentsProcessing]);
 
   const filteredKnowledge = useMemo(() => {
     const normalized = query.toLowerCase();
@@ -216,10 +249,35 @@ export function AppShell() {
 
   async function createProject(input: { name: string; owner: string; summary: string }) {
     try {
-      const data = hasProductionSession()
-        ? await createProductionProject(input)
-        : await createDemoProject(input);
+      const data = await createProductionProject(input);
       replaceWorkspace(data, t('projectCreated'));
+      return true;
+    } catch {
+      showNotice(t('saveFailed'));
+      return false;
+    }
+  }
+
+  async function updateProject(input: {
+    id: string;
+    name: string;
+    owner: string;
+    summary: string;
+  }) {
+    try {
+      const data = await updateProductionProject(input.id, input);
+      replaceWorkspace(data, t('projectUpdated'));
+      return true;
+    } catch {
+      showNotice(t('saveFailed'));
+      return false;
+    }
+  }
+
+  async function archiveProject(projectId: string) {
+    try {
+      const data = await archiveProductionProject(projectId);
+      replaceWorkspace(data, t('projectArchived'));
     } catch {
       showNotice(t('saveFailed'));
     }
@@ -227,10 +285,35 @@ export function AppShell() {
 
   async function createKnowledge(input: { title: string; type: string; summary: string }) {
     try {
-      const data = hasProductionSession()
-        ? await createProductionKnowledgeItem(input)
-        : await createDemoKnowledgeItem(input);
+      const data = await createProductionKnowledgeItem(input);
       replaceWorkspace(data, t('knowledgeItemCreated'));
+      return true;
+    } catch {
+      showNotice(t('saveFailed'));
+      return false;
+    }
+  }
+
+  async function updateKnowledge(input: {
+    id: string;
+    title: string;
+    type: string;
+    summary: string;
+  }) {
+    try {
+      const data = await updateProductionKnowledgeItem(input.id, input);
+      replaceWorkspace(data, t('knowledgeUpdated'));
+      return true;
+    } catch {
+      showNotice(t('saveFailed'));
+      return false;
+    }
+  }
+
+  async function archiveKnowledge(itemId: string) {
+    try {
+      const data = await archiveProductionKnowledgeItem(itemId);
+      replaceWorkspace(data, t('knowledgeArchived'));
     } catch {
       showNotice(t('saveFailed'));
     }
@@ -240,8 +323,10 @@ export function AppShell() {
     try {
       const data = await uploadProductionDocument(input);
       replaceWorkspace(data, t('documentUploaded'));
+      return true;
     } catch {
       showNotice(t('saveFailed'));
+      return false;
     }
   }
 
@@ -250,6 +335,24 @@ export function AppShell() {
       await downloadProductionDocument(documentId, title);
     } catch {
       showNotice(t('saveFailed'));
+    }
+  }
+
+  async function reprocessDocument(documentId: string) {
+    try {
+      const data = await reprocessProductionDocument(documentId);
+      replaceWorkspace(data, t('documentRequeued'));
+    } catch {
+      showNotice(t('saveFailed'));
+    }
+  }
+
+  async function searchDocuments(query: string) {
+    try {
+      return await searchProductionDocuments(query);
+    } catch {
+      showNotice(t('searchFailed'));
+      return [];
     }
   }
 
@@ -274,9 +377,9 @@ export function AppShell() {
   }
 
   async function inviteTeamMember(input: { email: string; role: string }) {
-    if (!workspaceData.organization.id || !hasProductionSession()) {
+    if (!workspaceData.organization.id || !hasAuthenticatedSession()) {
       showNotice(t('inviteRequiresLiveWorkspace'));
-      return;
+      return false;
     }
     try {
       const result = await createProductionInvitation({
@@ -284,8 +387,10 @@ export function AppShell() {
         ...input,
       });
       replaceWorkspace(result.workspace, t('invitationCreated'));
+      return true;
     } catch {
       showNotice(t('saveFailed'));
+      return false;
     }
   }
 
@@ -309,7 +414,7 @@ export function AppShell() {
   }
 
   async function cancelTeamInvitation(invitationId: string) {
-    if (!workspaceData.organization.id || !hasProductionSession()) {
+    if (!workspaceData.organization.id || !hasAuthenticatedSession()) {
       showNotice(t('inviteRequiresLiveWorkspace'));
       return;
     }
@@ -525,29 +630,48 @@ export function AppShell() {
           ) : activeView === 'Projects' ? (
             <ProjectsView
               data={workspaceData}
+              canEdit={
+                hasAuthenticatedSession() &&
+                ['Owner', 'Administrator', 'Manager'].includes(currentUser.role)
+              }
+              onArchiveProject={archiveProject}
               onAsk={askAssistant}
               onCreateProject={createProject}
+              onUpdateProject={updateProject}
               t={t}
             />
           ) : activeView === 'Knowledge' ? (
             <KnowledgeView
+              canEdit={
+                hasAuthenticatedSession() &&
+                ['Owner', 'Administrator', 'Manager', 'Member'].includes(currentUser.role)
+              }
               items={filteredKnowledge}
+              onArchiveKnowledge={archiveKnowledge}
               onCreateKnowledge={createKnowledge}
+              onUpdateKnowledge={updateKnowledge}
               query={query}
               setQuery={setQuery}
               t={t}
             />
           ) : activeView === 'Documents' ? (
             <DocumentsView
+              canUpload={
+                hasAuthenticatedSession() &&
+                ['Owner', 'Administrator', 'Manager', 'Member'].includes(currentUser.role)
+              }
               data={workspaceData}
               onDownloadDocument={downloadDocument}
               onCreateDocument={createDocument}
+              onReprocessDocument={reprocessDocument}
+              onSearchDocuments={searchDocuments}
               t={t}
             />
           ) : activeView === 'Integrations' ? (
-            <IntegrationsView showNotice={showNotice} t={t} />
+            <IntegrationsView t={t} />
           ) : activeView === 'Team' ? (
             <TeamView
+              canManage={['Owner', 'Administrator', 'Manager'].includes(currentUser.role)}
               data={workspaceData}
               onCancelInvitation={cancelTeamInvitation}
               onInvite={inviteTeamMember}
@@ -558,7 +682,12 @@ export function AppShell() {
           ) : activeView === 'Profile' ? (
             <ProfileView currentUser={currentUser} onSave={saveProfile} t={t} />
           ) : (
-            <SettingsView data={workspaceData} onSave={saveOrganizationSettings} t={t} />
+            <SettingsView
+              canEdit={['Owner', 'Administrator'].includes(currentUser.role)}
+              data={workspaceData}
+              onSave={saveOrganizationSettings}
+              t={t}
+            />
           )}
         </section>
       </main>
@@ -887,14 +1016,25 @@ function generateWorkspaceAnswer(
 }
 
 function ProjectsView({
+  canEdit,
   data,
+  onArchiveProject,
   onAsk,
   onCreateProject,
+  onUpdateProject,
   t,
 }: {
+  canEdit: boolean;
   data: WorkspaceData;
+  onArchiveProject: (projectId: string) => Promise<void>;
   onAsk: (question: string) => void;
-  onCreateProject: (input: { name: string; owner: string; summary: string }) => Promise<void>;
+  onCreateProject: (input: { name: string; owner: string; summary: string }) => Promise<boolean>;
+  onUpdateProject: (input: {
+    id: string;
+    name: string;
+    owner: string;
+    summary: string;
+  }) => Promise<boolean>;
   t: (key: TranslationKey) => string;
 }) {
   const [name, setName] = useState('');
@@ -903,76 +1043,66 @@ function ProjectsView({
 
   async function submitProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onCreateProject({ name, owner, summary });
-    setName('');
-    setOwner('');
-    setSummary('');
+    if (await onCreateProject({ name, owner, summary })) {
+      setName('');
+      setOwner('');
+      setSummary('');
+    }
   }
 
   return (
     <div className="space-y-5">
-      <form className="surface-panel rounded-ui p-5" onSubmit={submitProject}>
-        <h2 className="text-lg font-bold tracking-normal">{t('createProject')}</h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_1.2fr_auto]">
-          <input
-            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
-            aria-label={t('projectName')}
-            placeholder={t('projectNamePlaceholder')}
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <input
-            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
-            aria-label={t('projectOwner')}
-            placeholder={t('projectOwnerPlaceholder')}
-            required
-            value={owner}
-            onChange={(event) => setOwner(event.target.value)}
-          />
-          <input
-            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
-            aria-label={t('projectSummary')}
-            placeholder={t('projectSummaryPlaceholder')}
-            required
-            value={summary}
-            onChange={(event) => setSummary(event.target.value)}
-          />
-          <button
-            className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white"
-            type="submit"
-          >
-            {t('create')}
-          </button>
-        </div>
-      </form>
+      {canEdit ? (
+        <form className="surface-panel rounded-ui p-5" onSubmit={submitProject}>
+          <h2 className="text-lg font-bold tracking-normal">{t('createProject')}</h2>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_1.2fr_auto]">
+            <input
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              aria-label={t('projectName')}
+              placeholder={t('projectNamePlaceholder')}
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <input
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              aria-label={t('projectOwner')}
+              placeholder={t('projectOwnerPlaceholder')}
+              required
+              value={owner}
+              onChange={(event) => setOwner(event.target.value)}
+            />
+            <input
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              aria-label={t('projectSummary')}
+              placeholder={t('projectSummaryPlaceholder')}
+              required
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+            />
+            <button
+              className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white"
+              type="submit"
+            >
+              {t('create')}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <ReadOnlyNotice t={t} />
+      )}
       <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
       <div className="grid gap-4 lg:grid-cols-3">
         {data.projects.length ? (
           data.projects.map((project) => (
-            <div key={project.name} className="surface-panel rounded-ui p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {t('owner')}: {project.owner}
-                  </p>
-                </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                  {project.status}
-                </span>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-600">{project.summary}</p>
-              <div className="mt-4 h-2 rounded-full bg-slate-100">
-                <div
-                  className="h-2 rounded-full bg-teal"
-                  style={{ width: `${project.progress}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                {project.progress}% {t('complete')}
-              </p>
-            </div>
+            <ProjectCard
+              key={project.id ?? project.name}
+              canEdit={canEdit}
+              onArchive={onArchiveProject}
+              onUpdate={onUpdateProject}
+              project={project}
+              t={t}
+            />
           ))
         ) : (
           <EmptyState title={t('noProjectsTitle')} body={t('noProjectsBody')} />
@@ -982,77 +1112,259 @@ function ProjectsView({
   );
 }
 
+function ProjectCard({
+  canEdit,
+  onArchive,
+  onUpdate,
+  project,
+  t,
+}: {
+  canEdit: boolean;
+  onArchive: (projectId: string) => Promise<void>;
+  onUpdate: (input: {
+    id: string;
+    name: string;
+    owner: string;
+    summary: string;
+  }) => Promise<boolean>;
+  project: WorkspaceData['projects'][number];
+  t: (key: TranslationKey) => string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(project.name);
+  const [owner, setOwner] = useState(project.owner);
+  const [summary, setSummary] = useState(project.summary);
+
+  async function saveProject() {
+    if (!project.id || !name.trim() || !owner.trim() || !summary.trim()) return;
+    if (await onUpdate({ id: project.id, name, owner, summary })) {
+      setIsEditing(false);
+    }
+  }
+
+  function cancelEditing() {
+    setName(project.name);
+    setOwner(project.owner);
+    setSummary(project.summary);
+    setIsEditing(false);
+  }
+
+  async function archiveProject() {
+    if (project.id && window.confirm(t('archiveProjectConfirm'))) {
+      await onArchive(project.id);
+    }
+  }
+
+  return (
+    <article className="surface-panel rounded-ui p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {isEditing ? (
+            <div className="grid gap-3">
+              <input
+                aria-label={t('projectName')}
+                className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <input
+                aria-label={t('projectOwner')}
+                className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+                value={owner}
+                onChange={(event) => setOwner(event.target.value)}
+              />
+              <textarea
+                aria-label={t('projectSummary')}
+                className="field-frame min-h-24 rounded-ui p-3 text-sm outline-none"
+                value={summary}
+                onChange={(event) => setSummary(event.target.value)}
+              />
+            </div>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold tracking-normal">{project.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {t('owner')}: {project.owner}
+              </p>
+            </>
+          )}
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          {project.status}
+        </span>
+      </div>
+      {!isEditing ? (
+        <p className="mt-4 text-sm leading-6 text-slate-600">{project.summary}</p>
+      ) : null}
+      <div className="mt-4 h-2 rounded-full bg-slate-100">
+        <div className="h-2 rounded-full bg-teal" style={{ width: project.progress + '%' }} />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-slate-500">
+          {project.progress}% {t('complete')}
+        </p>
+        {canEdit && project.id ? (
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  aria-label={t('save')}
+                  className="primary-action inline-flex h-9 w-9 items-center justify-center rounded-ui text-white"
+                  title={t('save')}
+                  type="button"
+                  onClick={saveProject}
+                >
+                  <Save size={16} aria-hidden="true" />
+                </button>
+                <button
+                  aria-label={t('cancel')}
+                  className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                  title={t('cancel')}
+                  type="button"
+                  onClick={cancelEditing}
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </>
+            ) : (
+              <button
+                aria-label={t('edit')}
+                className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                title={t('edit')}
+                type="button"
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil size={16} aria-hidden="true" />
+              </button>
+            )}
+            <button
+              aria-label={t('archive')}
+              className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui text-red-700"
+              title={t('archive')}
+              type="button"
+              onClick={archiveProject}
+            >
+              <Archive size={16} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function KnowledgeView({
+  canEdit,
   items,
+  onArchiveKnowledge,
   onCreateKnowledge,
+  onUpdateKnowledge,
   query,
   setQuery,
   t,
 }: {
+  canEdit: boolean;
   items: typeof knowledgeItems;
-  onCreateKnowledge: (input: { title: string; type: string; summary: string }) => Promise<void>;
+  onArchiveKnowledge: (itemId: string) => Promise<void>;
+  onCreateKnowledge: (input: { title: string; type: string; summary: string }) => Promise<boolean>;
+  onUpdateKnowledge: (input: {
+    id: string;
+    title: string;
+    type: string;
+    summary: string;
+  }) => Promise<boolean>;
   query: string;
   setQuery: (query: string) => void;
   t: (key: TranslationKey) => string;
 }) {
   const [title, setTitle] = useState('');
+  const [type, setType] = useState('decision');
+  const [summary, setSummary] = useState('');
 
   async function submitKnowledge(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onCreateKnowledge({
-      title,
-      type: 'decision',
-      summary: 'A new decision was captured from the workspace.',
-    });
-    setTitle('');
+    if (await onCreateKnowledge({ title, type, summary })) {
+      setTitle('');
+      setType('decision');
+      setSummary('');
+    }
   }
 
   return (
-    <div className="surface-panel rounded-ui p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-teal">{t('knowledgeExplorer')}</p>
-          <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('searchCompanyMemory')}</h2>
+    <div className="space-y-5">
+      <div className="surface-panel rounded-ui p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-teal">{t('knowledgeExplorer')}</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-normal">{t('searchCompanyMemory')}</h2>
+          </div>
+          <label className="field-frame flex h-10 min-w-72 items-center gap-2 rounded-ui px-3">
+            <Search size={17} className="text-slate-400" aria-hidden="true" />
+            <input
+              className="w-full border-0 bg-transparent text-sm outline-none"
+              placeholder={t('searchPlaceholder')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
         </div>
-        <label className="field-frame flex h-10 min-w-72 items-center gap-2 rounded-ui px-3">
-          <Search size={17} className="text-slate-400" aria-hidden="true" />
-          <input
-            className="w-full border-0 bg-transparent text-sm outline-none"
-            placeholder={t('searchPlaceholder')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        {canEdit ? (
+          <form
+            className="mt-5 grid gap-3 lg:grid-cols-[1fr_0.55fr_1.3fr_auto]"
+            onSubmit={submitKnowledge}
+          >
+            <input
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              aria-label={t('knowledgeTitle')}
+              placeholder={t('knowledgeTitlePlaceholder')}
+              required
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+            <select
+              aria-label={t('knowledgeType')}
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+            >
+              {knowledgeTypeOptions(t).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <input
+              aria-label={t('knowledgeContent')}
+              className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+              placeholder={t('knowledgeContentPlaceholder')}
+              required
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+            />
+            <button
+              className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white"
+              type="submit"
+            >
+              {t('addKnowledge')}
+            </button>
+          </form>
+        ) : (
+          <div className="mt-5">
+            <ReadOnlyNotice t={t} />
+          </div>
+        )}
       </div>
-      <form className="mt-5 flex flex-wrap gap-3" onSubmit={submitKnowledge}>
-        <input
-          className="h-10 min-w-72 field-frame rounded-ui px-3 text-sm outline-none"
-          aria-label={t('knowledgeTitle')}
-          placeholder={t('knowledgeTitlePlaceholder')}
-          required
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <button
-          className="h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
-          type="submit"
-        >
-          {t('addKnowledge')}
-        </button>
-      </form>
-      <div className="mt-5 grid gap-3">
+      <div className="grid gap-3">
         {items.length ? (
           items.map((item) => (
-            <div key={item.title} className="quiet-panel rounded-ui p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal">
-                  {item.type}
-                </span>
-                <span className="text-xs font-medium text-slate-500">{item.project}</span>
-              </div>
-              <h3 className="mt-3 text-base font-bold tracking-normal">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{item.summary}</p>
-            </div>
+            <KnowledgeCard
+              key={item.id ?? item.title}
+              canEdit={canEdit}
+              item={item}
+              onArchive={onArchiveKnowledge}
+              onUpdate={onUpdateKnowledge}
+              t={t}
+            />
           ))
         ) : (
           <EmptyState title={t('noKnowledgeTitle')} body={t('noKnowledgeBody')} />
@@ -1062,34 +1374,251 @@ function KnowledgeView({
   );
 }
 
+function KnowledgeCard({
+  canEdit,
+  item,
+  onArchive,
+  onUpdate,
+  t,
+}: {
+  canEdit: boolean;
+  item: (typeof knowledgeItems)[number];
+  onArchive: (itemId: string) => Promise<void>;
+  onUpdate: (input: {
+    id: string;
+    title: string;
+    type: string;
+    summary: string;
+  }) => Promise<boolean>;
+  t: (key: TranslationKey) => string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [type, setType] = useState(item.type);
+  const [summary, setSummary] = useState(item.summary);
+
+  async function saveKnowledge() {
+    if (!item.id || !title.trim() || !summary.trim()) return;
+    if (await onUpdate({ id: item.id, title, type, summary })) {
+      setIsEditing(false);
+    }
+  }
+
+  function cancelEditing() {
+    setTitle(item.title);
+    setType(item.type);
+    setSummary(item.summary);
+    setIsEditing(false);
+  }
+
+  async function archiveKnowledge() {
+    if (item.id && window.confirm(t('archiveKnowledgeConfirm'))) await onArchive(item.id);
+  }
+
+  return (
+    <article className="surface-panel rounded-ui p-4">
+      {isEditing ? (
+        <div className="grid gap-3 lg:grid-cols-[1fr_0.55fr_1.3fr_auto]">
+          <input
+            aria-label={t('knowledgeTitle')}
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+          <select
+            aria-label={t('knowledgeType')}
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            value={type.toLowerCase().replace(/ /g, '_')}
+            onChange={(event) => setType(event.target.value)}
+          >
+            {knowledgeTypeOptions(t).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label={t('knowledgeContent')}
+            className="field-frame h-10 rounded-ui px-3 text-sm outline-none"
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+          />
+          <div className="flex gap-2">
+            <button
+              aria-label={t('save')}
+              className="primary-action inline-flex h-10 w-10 items-center justify-center rounded-ui text-white"
+              title={t('save')}
+              type="button"
+              onClick={saveKnowledge}
+            >
+              <Save size={16} aria-hidden="true" />
+            </button>
+            <button
+              aria-label={t('cancel')}
+              className="secondary-action inline-flex h-10 w-10 items-center justify-center rounded-ui"
+              title={t('cancel')}
+              type="button"
+              onClick={cancelEditing}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-teal">
+                  {item.type}
+                </span>
+                <span className="text-xs font-medium text-slate-500">{item.project}</span>
+              </div>
+              <h3 className="mt-3 text-base font-bold tracking-normal">{item.title}</h3>
+            </div>
+            {canEdit && item.id ? (
+              <div className="flex gap-2">
+                <button
+                  aria-label={t('edit')}
+                  className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                  title={t('edit')}
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <Pencil size={16} aria-hidden="true" />
+                </button>
+                <button
+                  aria-label={t('archive')}
+                  className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui text-red-700"
+                  title={t('archive')}
+                  type="button"
+                  onClick={archiveKnowledge}
+                >
+                  <Archive size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{item.summary}</p>
+        </>
+      )}
+    </article>
+  );
+}
+
+function knowledgeTypeOptions(t: (key: TranslationKey) => string) {
+  return [
+    { value: 'decision', label: t('typeDecision') },
+    { value: 'note', label: t('typeNote') },
+    { value: 'meeting_summary', label: t('typeMeeting') },
+    { value: 'project_update', label: t('typeProjectUpdate') },
+    { value: 'customer_information', label: t('typeCustomerInformation') },
+    { value: 'process', label: t('typeProcess') },
+    { value: 'risk', label: t('typeRisk') },
+  ];
+}
+
+function ReadOnlyNotice({ t }: { t: (key: TranslationKey) => string }) {
+  return (
+    <div className="quiet-panel flex items-center gap-3 rounded-ui p-4 text-sm font-semibold text-slate-600">
+      <LockKeyhole size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
+      {t('readOnlyAccess')}
+    </div>
+  );
+}
+
 function DocumentsView({
+  canUpload,
   data,
   onCreateDocument,
   onDownloadDocument,
+  onReprocessDocument,
+  onSearchDocuments,
   t,
 }: {
+  canUpload: boolean;
   data: WorkspaceData;
-  onCreateDocument: (input: { title: string; file: File }) => Promise<void>;
+  onCreateDocument: (input: { title: string; file: File }) => Promise<boolean>;
   onDownloadDocument: (documentId: string, title: string) => Promise<void>;
+  onReprocessDocument: (documentId: string) => Promise<void>;
+  onSearchDocuments: (query: string) => Promise<DocumentSearchResult[]>;
   t: (key: TranslationKey) => string;
 }) {
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<DocumentSearchResult[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
       return;
     }
-    await onCreateDocument({ title: title || file.name.replace(/\.[^.]+$/, ''), file });
-    setTitle('');
-    setFile(null);
+    if (await onCreateDocument({ title: title || file.name.replace(/\.[^.]+$/, ''), file })) {
+      setTitle('');
+      setFile(null);
+    }
+  }
+
+  async function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (searchQuery.trim().length < 2) return;
+    setIsSearching(true);
+    setSearchResults(await onSearchDocuments(searchQuery.trim()));
+    setIsSearching(false);
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_0.45fr]">
       <div className="surface-panel rounded-ui p-5">
         <h2 className="text-2xl font-bold tracking-normal">{t('documents')}</h2>
+        <form className="mt-5 flex gap-2" onSubmit={submitSearch}>
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">{t('searchDocuments')}</span>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              size={17}
+              aria-hidden="true"
+            />
+            <input
+              className="h-10 w-full field-frame rounded-ui pl-10 pr-3 text-sm outline-none"
+              placeholder={t('searchDocumentsPlaceholder')}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
+          <button
+            className="primary-action h-10 rounded-ui px-4 text-sm font-semibold text-white disabled:opacity-50"
+            disabled={isSearching || searchQuery.trim().length < 2}
+            type="submit"
+          >
+            {isSearching ? t('searching') : t('searchDocuments')}
+          </button>
+        </form>
+        {searchResults ? (
+          <div className="mt-3 border-l-2 border-teal pl-3">
+            {searchResults.length ? (
+              <div className="space-y-2">
+                {searchResults.slice(0, 6).map((result) => (
+                  <button
+                    key={`${result.documentId}-${result.chunkIndex}`}
+                    className="block w-full rounded-ui border border-slate-200 bg-white p-3 text-left transition hover:border-teal/50"
+                    type="button"
+                    onClick={() => onDownloadDocument(result.documentId, result.title)}
+                  >
+                    <span className="text-sm font-bold text-slate-800">{result.title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-600">
+                      {result.excerpt}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="py-2 text-sm text-slate-500">{t('documentSearchNoResults')}</p>
+            )}
+          </div>
+        ) : null}
         <div className="table-surface mt-5 overflow-hidden rounded-ui">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
@@ -1104,27 +1633,59 @@ function DocumentsView({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {data.documents.map((document) => (
-                <tr key={document.title}>
-                  <td className="px-4 py-3 font-medium text-slate-800">{document.title}</td>
-                  <td className="px-4 py-3 text-slate-600">{document.project}</td>
-                  <td className="px-4 py-3 text-slate-600">{document.type}</td>
-                  <td className="px-4 py-3 text-slate-600">{document.status}</td>
-                  <td className="px-4 py-3 text-right">
-                    {document.status !== 'Metadata only' && !document.id.startsWith('demo-') ? (
-                      <button
-                        className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
-                        type="button"
-                        title={t('downloadDocument')}
-                        aria-label={t('downloadDocument')}
-                        onClick={() => onDownloadDocument(document.id, document.title)}
-                      >
-                        <Download size={16} aria-hidden="true" />
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+              {data.documents.map((document) => {
+                const canRetry = ['Processing failed', 'Queue unavailable'].includes(
+                  document.status,
+                );
+                return (
+                  <tr key={document.id}>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {document.title}
+                      {document.processingError ? (
+                        <span className="mt-1 block max-w-md text-xs font-normal text-red-600">
+                          {t('processingError')}: {document.processingError}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{document.project}</td>
+                    <td className="px-4 py-3 text-slate-600">{document.type}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <span>{document.status}</span>
+                      {document.chunkCount ? (
+                        <span className="mt-1 block text-xs text-slate-400">
+                          {document.chunkCount} {t('documentChunks')}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-2">
+                        {canRetry && canUpload && !document.id.startsWith('demo-') ? (
+                          <button
+                            className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                            type="button"
+                            title={t('reprocessDocument')}
+                            aria-label={t('reprocessDocument')}
+                            onClick={() => onReprocessDocument(document.id)}
+                          >
+                            <RotateCcw size={16} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                        {document.status !== 'Metadata only' && !document.id.startsWith('demo-') ? (
+                          <button
+                            className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                            type="button"
+                            title={t('downloadDocument')}
+                            aria-label={t('downloadDocument')}
+                            onClick={() => onDownloadDocument(document.id, document.title)}
+                          >
+                            <Download size={16} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1134,44 +1695,42 @@ function DocumentsView({
           </div>
         ) : null}
       </div>
-      <form className="surface-panel rounded-ui p-5" onSubmit={submitDocument}>
-        <Upload className="text-teal" size={24} aria-hidden="true" />
-        <h3 className="mt-4 text-lg font-bold tracking-normal">{t('uploadDocument')}</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{t('documentUploadHelp')}</p>
-        <input
-          className="mt-4 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
-          placeholder={t('documentTitlePlaceholder')}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <label className="secondary-action mt-3 flex min-h-20 cursor-pointer items-center justify-center rounded-ui px-4 py-3 text-center text-sm font-semibold">
+      {canUpload ? (
+        <form className="surface-panel rounded-ui p-5" onSubmit={submitDocument}>
+          <Upload className="text-teal" size={24} aria-hidden="true" />
+          <h3 className="mt-4 text-lg font-bold tracking-normal">{t('uploadDocument')}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t('documentUploadHelp')}</p>
           <input
-            className="sr-only"
-            accept=".pdf,.docx,.txt,.md,.markdown"
-            type="file"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className="mt-4 h-10 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            placeholder={t('documentTitlePlaceholder')}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
           />
-          {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB` : t('selectFile')}
-        </label>
-        <button
-          className="mt-4 h-10 w-full primary-action rounded-ui px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!file}
-          type="submit"
-        >
-          {t('uploadDocument')}
-        </button>
-      </form>
+          <label className="secondary-action mt-3 flex min-h-20 cursor-pointer items-center justify-center rounded-ui px-4 py-3 text-center text-sm font-semibold">
+            <input
+              className="sr-only"
+              accept=".pdf,.docx,.txt,.md,.markdown"
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB` : t('selectFile')}
+          </label>
+          <button
+            className="mt-4 h-10 w-full primary-action rounded-ui px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!file}
+            type="submit"
+          >
+            {t('uploadDocument')}
+          </button>
+        </form>
+      ) : (
+        <ReadOnlyNotice t={t} />
+      )}
     </div>
   );
 }
 
-function IntegrationsView({
-  showNotice,
-  t,
-}: {
-  showNotice: (message: string) => void;
-  t: (key: TranslationKey) => string;
-}) {
+function IntegrationsView({ t }: { t: (key: TranslationKey) => string }) {
   const integrations = [
     'Gmail',
     'Google Drive',
@@ -1187,15 +1746,16 @@ function IntegrationsView({
       {integrations.map((integration) => (
         <div key={integration} className="surface-panel rounded-ui p-5">
           <Plug className="text-signal" size={22} aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-bold tracking-normal">{integration}</h2>
+          <div className="mt-4 flex items-start justify-between gap-3">
+            <h2 className="text-lg font-bold tracking-normal">{integration}</h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {t('planned')}
+            </span>
+          </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">{t('integrationPrepared')}</p>
-          <button
-            className="secondary-action mt-4 h-9 rounded-ui px-3 text-sm font-semibold"
-            type="button"
-            onClick={() => showNotice(`${integration} ${t('integrationLater')}`)}
-          >
-            {t('connect')}
-          </button>
+          <p className="mt-4 border-l-2 border-teal pl-3 text-xs font-semibold leading-5 text-teal">
+            {t('integrationLocalOnly')}
+          </p>
         </div>
       ))}
     </div>
@@ -1203,14 +1763,16 @@ function IntegrationsView({
 }
 
 function TeamView({
+  canManage,
   data,
   onCancelInvitation,
   onInvite,
   t,
 }: {
+  canManage: boolean;
   data: WorkspaceData;
   onCancelInvitation: (invitationId: string) => Promise<void>;
-  onInvite: (input: { email: string; role: string }) => Promise<void>;
+  onInvite: (input: { email: string; role: string }) => Promise<boolean>;
   t: (key: TranslationKey) => string;
 }) {
   const [email, setEmail] = useState('');
@@ -1226,9 +1788,10 @@ function TeamView({
     if (!email) {
       return;
     }
-    await onInvite({ email, role });
-    setEmail('');
-    setRole('Member');
+    if (await onInvite({ email, role })) {
+      setEmail('');
+      setRole('Member');
+    }
   }
 
   return (
@@ -1261,45 +1824,49 @@ function TeamView({
       </div>
 
       <div className="grid gap-5">
-        <form className="surface-panel rounded-ui p-5" onSubmit={submitInvitation}>
-          <UserPlus className="text-teal" size={24} aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-bold tracking-normal">{t('inviteTeamMember')}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{t('inviteTeamMemberBody')}</p>
-          <label className="mt-4 block">
-            <span className="text-sm font-semibold text-slate-700">{t('email')}</span>
-            <span className="field-frame mt-2 flex h-11 items-center gap-2 rounded-ui px-3">
-              <Mail size={17} className="text-slate-400" aria-hidden="true" />
-              <input
-                className="w-full border-0 bg-transparent text-sm outline-none"
-                placeholder="new.member@company.com"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </span>
-          </label>
-          <label className="mt-4 block">
-            <span className="text-sm font-semibold text-slate-700">{t('role')}</span>
-            <select
-              className="field-frame mt-2 h-11 w-full rounded-ui px-3 text-sm outline-none"
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
+        {canManage ? (
+          <form className="surface-panel rounded-ui p-5" onSubmit={submitInvitation}>
+            <UserPlus className="text-teal" size={24} aria-hidden="true" />
+            <h2 className="mt-4 text-lg font-bold tracking-normal">{t('inviteTeamMember')}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{t('inviteTeamMemberBody')}</p>
+            <label className="mt-4 block">
+              <span className="text-sm font-semibold text-slate-700">{t('email')}</span>
+              <span className="field-frame mt-2 flex h-11 items-center gap-2 rounded-ui px-3">
+                <Mail size={17} className="text-slate-400" aria-hidden="true" />
+                <input
+                  className="w-full border-0 bg-transparent text-sm outline-none"
+                  placeholder="new.member@company.com"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </span>
+            </label>
+            <label className="mt-4 block">
+              <span className="text-sm font-semibold text-slate-700">{t('role')}</span>
+              <select
+                className="field-frame mt-2 h-11 w-full rounded-ui px-3 text-sm outline-none"
+                value={role}
+                onChange={(event) => setRole(event.target.value)}
+              >
+                {['Administrator', 'Manager', 'Member', 'Viewer'].map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="primary-action mt-5 inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
+              type="submit"
             >
-              {['Administrator', 'Manager', 'Member', 'Viewer'].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="primary-action mt-5 inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
-            type="submit"
-          >
-            <UserPlus size={16} aria-hidden="true" />
-            {t('sendInvite')}
-          </button>
-        </form>
+              <UserPlus size={16} aria-hidden="true" />
+              {t('sendInvite')}
+            </button>
+          </form>
+        ) : (
+          <ReadOnlyNotice t={t} />
+        )}
 
         <div className="surface-panel rounded-ui p-5">
           <h2 className="text-lg font-bold tracking-normal">{t('pendingInvitations')}</h2>
@@ -1329,14 +1896,16 @@ function TeamView({
                         <Copy size={16} aria-hidden="true" />
                       </button>
                     ) : null}
-                    <button
-                      className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
-                      type="button"
-                      aria-label={t('cancelInvitation')}
-                      onClick={() => onCancelInvitation(invitation.id)}
-                    >
-                      <X size={16} aria-hidden="true" />
-                    </button>
+                    {canManage ? (
+                      <button
+                        className="secondary-action inline-flex h-9 w-9 items-center justify-center rounded-ui"
+                        type="button"
+                        aria-label={t('cancelInvitation')}
+                        onClick={() => onCancelInvitation(invitation.id)}
+                      >
+                        <X size={16} aria-hidden="true" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -1383,6 +1952,25 @@ function ProfileView({
   t: (key: TranslationKey) => string;
 }) {
   const [name, setName] = useState(currentUser.name);
+  const [verificationUrl, setVerificationUrl] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+
+  async function createVerificationLink() {
+    setVerificationMessage('');
+    try {
+      const result = await requestEmailVerification();
+      if (result.alreadyVerified) {
+        setVerificationMessage(t('emailAlreadyVerified'));
+      } else if (result.previewUrl) {
+        setVerificationUrl(result.previewUrl);
+        setVerificationMessage(t('verificationLinkReady'));
+      } else {
+        setVerificationMessage(t('verificationRequestSent'));
+      }
+    } catch {
+      setVerificationMessage(t('verificationRequestFailed'));
+    }
+  }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[0.7fr_1.3fr]">
@@ -1429,30 +2017,55 @@ function ProfileView({
         >
           {t('saveChanges')}
         </button>
+        <div className="mt-6 border-t border-line pt-5">
+          <p className="text-sm font-bold text-slate-800">{t('emailVerification')}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{t('emailVerificationBody')}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              className="secondary-action h-10 rounded-ui px-4 text-sm font-semibold"
+              onClick={createVerificationLink}
+              type="button"
+            >
+              {t('requestVerification')}
+            </button>
+            {verificationUrl ? (
+              <a
+                className="text-sm font-semibold text-teal hover:text-teal-700"
+                href={verificationUrl}
+              >
+                {t('openVerificationLink')}
+              </a>
+            ) : null}
+          </div>
+          {verificationMessage ? (
+            <p className="mt-3 text-sm font-medium text-slate-600">{verificationMessage}</p>
+          ) : null}
+        </div>
       </form>
     </div>
   );
 }
 
 function SettingsView({
+  canEdit,
   data,
   onSave,
   t,
 }: {
+  canEdit: boolean;
   data: WorkspaceData;
   onSave: (input: { name: string; industry: string; aiProvider: string }) => Promise<void>;
   t: (key: TranslationKey) => string;
 }) {
   const [name, setName] = useState(data.organization.name);
   const [industry, setIndustry] = useState(data.organization.industry ?? 'Knowledge business');
-  const [aiProvider, setAiProvider] = useState('mock');
 
   return (
     <form
       className="grid gap-5 lg:grid-cols-[1fr_0.8fr]"
       onSubmit={(event) => {
         event.preventDefault();
-        onSave({ name, industry, aiProvider });
+        onSave({ name, industry, aiProvider: 'mock' });
       }}
     >
       <div className="surface-panel rounded-ui p-5">
@@ -1463,6 +2076,7 @@ function SettingsView({
           <span className="text-sm font-semibold text-slate-700">{t('organization')}</span>
           <input
             className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            disabled={!canEdit}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -1471,16 +2085,23 @@ function SettingsView({
           <span className="text-sm font-semibold text-slate-700">{t('industry')}</span>
           <input
             className="mt-2 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
+            disabled={!canEdit}
             value={industry}
             onChange={(event) => setIndustry(event.target.value)}
           />
         </label>
-        <button
-          className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
-          type="submit"
-        >
-          {t('saveChanges')}
-        </button>
+        {canEdit ? (
+          <button
+            className="mt-5 h-10 primary-action rounded-ui px-4 text-sm font-semibold text-white"
+            type="submit"
+          >
+            {t('saveChanges')}
+          </button>
+        ) : (
+          <div className="mt-5">
+            <ReadOnlyNotice t={t} />
+          </div>
+        )}
       </div>
       <div className="grid gap-5">
         <div className="surface-panel rounded-ui p-5">
@@ -1488,14 +2109,14 @@ function SettingsView({
           <h2 className="mt-4 text-lg font-bold tracking-normal">{t('aiProvider')}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">{t('aiProviderSettingsBody')}</p>
           <select
-            className="mt-4 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none"
-            value={aiProvider}
-            onChange={(event) => setAiProvider(event.target.value)}
+            aria-label={t('aiProvider')}
+            className="mt-4 h-11 w-full field-frame rounded-ui px-3 text-sm outline-none disabled:cursor-not-allowed disabled:bg-slate-50"
+            value="mock"
+            disabled
           >
             <option value="mock">{t('mockLocalAssistant')}</option>
-            <option value="openai">{t('openAiReady')}</option>
-            <option value="custom">{t('customProvider')}</option>
           </select>
+          <p className="mt-3 text-xs font-semibold leading-5 text-teal">{t('localOnlyMode')}</p>
         </div>
         <div className="surface-panel rounded-ui p-5">
           <ShieldCheck className="text-teal" size={22} aria-hidden="true" />

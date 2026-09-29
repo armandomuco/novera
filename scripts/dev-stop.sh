@@ -23,7 +23,7 @@ stop_service() {
     echo "$name PID $pid is not running."
   fi
 
-  rm -f "$pid_file"
+  rm -f "$pid_file" "$PID_DIR/$name.port"
 }
 
 stop_service "api"

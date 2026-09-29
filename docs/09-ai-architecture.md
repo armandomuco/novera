@@ -39,3 +39,26 @@ sequenceDiagram
 ## Prompt Versioning
 
 Each assistant workflow stores promptVersion, model, provider, token usage, retrieval filters, and cited source IDs.
+
+## Implemented Document Ingestion
+
+```mermaid
+flowchart LR
+  Upload[Authorized upload] --> Validate[Type, size, signature, safety hook]
+  Validate --> Store[MinIO or S3-compatible storage]
+  Store --> Text{TXT or Markdown?}
+  Text -->|Yes| Extract[Immediate extraction]
+  Text -->|No| Queue[BullMQ on Redis]
+  Queue --> Worker[PDF or DOCX worker]
+  Extract --> Normalize[Normalize and summarize]
+  Worker --> Normalize
+  Normalize --> Chunks[Tenant-scoped document chunks]
+  Chunks --> Search[MongoDB full-text search]
+```
+
+- TXT and Markdown are processed in the upload request; PDF and DOCX use a worker with three attempts and exponential backoff.
+- Current summaries are deterministic local excerpts, not AI-generated claims.
+- Search applies the authenticated organization and optional validated project filter before returning an excerpt and source link.
+- The web workspace polls only while documents are processing and exposes retry for failed or unavailable jobs.
+
+Next retrieval layer: add embeddings behind a provider-independent interface, combine text and vector scores, then use the authorized ranked chunks as the only factual context for the assistant.

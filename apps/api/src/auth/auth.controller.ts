@@ -2,12 +2,15 @@ import { Body, Controller, Get, Headers, Param, Patch, Post, UseGuards } from '@
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import {
   AcceptInvitationDto,
+  CompletePasswordResetDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
+  RequestPasswordResetDto,
   SwitchOrganizationDto,
   UpdateProfileDto,
+  VerifyEmailDto,
 } from './auth.dto';
 import { AuthGuard } from './auth.guard';
 import { CurrentAuth } from './current-auth.decorator';
@@ -47,6 +50,31 @@ export class AuthController {
   @ApiOkResponse({ description: 'Revokes a refresh token session.' })
   logout(@Body() body: LogoutDto) {
     return this.authService.logout(body.refreshToken);
+  }
+
+  @Post('password-reset/request')
+  @ApiOkResponse({ description: 'Creates a short-lived password reset request.' })
+  requestPasswordReset(@Body() body: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Post('password-reset/complete')
+  @ApiOkResponse({ description: 'Consumes a password reset token and revokes active sessions.' })
+  completePasswordReset(@Body() body: CompletePasswordResetDto) {
+    return this.authService.completePasswordReset(body.token, body.password);
+  }
+
+  @Post('email-verification/verify')
+  @ApiOkResponse({ description: 'Consumes an email verification token.' })
+  verifyEmail(@Body() body: VerifyEmailDto) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  @Post('email-verification/request')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ description: 'Creates a new verification request for the current user.' })
+  requestEmailVerification(@CurrentAuth() auth: AuthContext) {
+    return this.authService.requestEmailVerification(auth);
   }
 
   @Get('me')

@@ -5,6 +5,7 @@ export type AuthPayload = {
   organizationId: string;
   accessToken: string;
   refreshToken: string;
+  verificationPreviewUrl?: string;
 };
 
 type ApiResponse<T> = {
@@ -51,6 +52,60 @@ export async function loginUser(email: string, password: string): Promise<AuthPa
   }
   const payload = (await response.json()) as ApiResponse<AuthPayload>;
   persistAuth(payload.data);
+  return payload.data;
+}
+
+export async function requestPasswordReset(email: string) {
+  const response = await fetch('/api/v1/auth/password-reset/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    throw new Error(`Password reset request failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<{
+    accepted: boolean;
+    message: string;
+    previewUrl?: string;
+  }>;
+  return payload.data;
+}
+
+export async function completePasswordReset(token: string, password: string) {
+  const response = await fetch('/api/v1/auth/password-reset/complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  if (!response.ok) {
+    throw new Error(`Password reset failed: ${response.status}`);
+  }
+}
+
+export async function verifyEmail(token: string) {
+  const response = await fetch('/api/v1/auth/email-verification/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) {
+    throw new Error(`Email verification failed: ${response.status}`);
+  }
+}
+
+export async function requestEmailVerification() {
+  const response = await authenticatedFetch('/api/v1/auth/email-verification/request', {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Email verification request failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as ApiResponse<{
+    accepted: boolean;
+    alreadyVerified?: boolean;
+    previewUrl?: string;
+  }>;
   return payload.data;
 }
 

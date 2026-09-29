@@ -8,7 +8,7 @@ const environmentSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6380),
   JWT_ACCESS_SECRET: z.string().min(24).default('development-access-secret-change-me'),
   JWT_REFRESH_SECRET: z.string().min(24).default('development-refresh-secret-change-me'),
-  AI_PROVIDER: z.string().min(1).default('mock'),
+  AI_PROVIDER: z.literal('mock').default('mock'),
   AI_API_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().optional(),
   WEB_APP_URL: z.string().url().default('http://localhost:5173'),

@@ -59,3 +59,45 @@ Trade-offs: local development requires MinIO for real uploads, but database size
 Decision: upgrade React Router from v6 to v7.18.3 after npm reported moderate open-redirect and SSR hydration advisories with no patched v6 release.
 
 Trade-offs: this is a major dependency upgrade, but Novera uses routing APIs retained by v7 and the migration passed lint, tests, and production compilation. The production dependency audit now reports zero known vulnerabilities.
+
+## 2026-09-03: No-Cost Local Testing By Default
+
+Decision: local development uses MongoDB, Redis, MinIO, and the grounded mock assistant without contacting paid external providers. Integration cards remain a transparent planned catalog and do not expose fake connection actions. Demo and pricing flows never request payment details.
+
+Trade-offs: email delivery, hosted AI, cloud storage, SMS, OAuth integrations, and billing remain unavailable in local testing. Each can be introduced later behind an explicit configuration flag after cost, quota, privacy, and failure behavior are reviewed.
+
+## 2026-09-25: Scope Resource Queries To The Active Tenant
+
+Decision: project, knowledge, and document lookups include the authenticated session's organization ID in the database query itself. Client-provided organization IDs never select the tenant.
+
+Trade-offs: service methods perform an active-membership check before each tenant-owned query, adding a small database cost in exchange for a clear cross-organization isolation boundary.
+
+## 2026-09-25: Use One Authenticated Workspace Path
+
+Decision: seeded demo users and newly registered users both use the production authentication and tenant-scoped workspace APIs. Public demo credentials remain documented locally but are not shown on the login or signup screens.
+
+Trade-offs: local demonstrations require MongoDB seed data and a running API, but behavior now matches the real product instead of maintaining a second mutation path.
+
+## 2026-09-25: Select Development Ports Without Stopping Other Apps
+
+Decision: the development launcher probes for free API and web ports, passes the selected API address to Vite's proxy, and prints the actual URLs. It never stops an unrelated process to reclaim a preferred port.
+
+Trade-offs: local URLs may differ from the defaults when ports are occupied, so invitation preview URLs and proxy configuration are supplied dynamically by the launcher.
+
+## 2026-09-25: Store Authentication Action Tokens As Hashes
+
+Decision: email-verification and password-reset links use random 256-bit single-use tokens. Only SHA-256 hashes are stored in MongoDB, earlier unused tokens are invalidated, verification links expire after 24 hours, and reset links expire after one hour.
+
+Trade-offs: development can return a local preview URL for testing, while production requires an email-delivery adapter. Password resets revoke every active user session, which is deliberately less convenient but limits damage from a compromised session.
+
+## 2026-09-25: Replace Custom JWT Handling
+
+Decision: use the audited `jsonwebtoken` package for HS256 access and refresh token signing and verification, with explicit algorithm allow-listing and the existing server-side session checks.
+
+Trade-offs: this adds a small dependency but removes custom cryptographic token parsing and keeps existing local token semantics compatible.
+
+## 2026-09-29: Process Documents Locally Before Adding Hosted AI
+
+Decision: use local PDF and DOCX extraction, deterministic extractive summaries, BullMQ with Redis, and tenant-scoped MongoDB text indexes for the first production document pipeline. TXT and Markdown stay synchronous; binary document extraction runs in a retryable background worker.
+
+Trade-offs: the MVP gains real searchable documents without paid APIs, but keyword ranking is less flexible than hybrid vector search and local summaries are not abstractive. Provider-independent embeddings and model-generated answers will be layered on only after authorization, citation, and evaluation coverage are in place.

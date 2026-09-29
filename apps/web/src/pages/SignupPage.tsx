@@ -25,8 +25,13 @@ export function SignupPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      await registerUser({ name, email, password, organizationName });
-      navigate('/app');
+      const auth = await registerUser({ name, email, password, organizationName });
+      if (auth.verificationPreviewUrl) {
+        const previewUrl = new URL(auth.verificationPreviewUrl);
+        navigate(`${previewUrl.pathname}${previewUrl.search}`);
+      } else {
+        navigate('/app');
+      }
     } catch {
       setMessage(t('signupFailed'));
     }

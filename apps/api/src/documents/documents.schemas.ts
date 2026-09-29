@@ -47,6 +47,9 @@ export class Document {
   @Prop({ type: String, default: null })
   processingError?: string | null;
 
+  @Prop({ type: Number, default: 0 })
+  chunkCount!: number;
+
   @Prop({ type: Date, default: null })
   extractedAt?: Date | null;
 

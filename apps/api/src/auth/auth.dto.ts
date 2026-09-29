@@ -63,3 +63,24 @@ export class SwitchOrganizationDto {
   @IsMongoId()
   organizationId!: string;
 }
+
+export class RequestPasswordResetDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class CompletePasswordResetDto {
+  @IsString()
+  @MinLength(32)
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+export class VerifyEmailDto {
+  @IsString()
+  @MinLength(32)
+  token!: string;
+}

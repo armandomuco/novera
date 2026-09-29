@@ -65,14 +65,16 @@ Indexes: organizationId + type, organizationId + projectId, tags, text index on 
 ### documents
 
 Purpose: uploaded file metadata.
-Fields: organizationId, projectId, title, fileName, mimeType, sizeBytes, storageKey, processingStatus, extractedTextHash, aiSummary, permissions, createdBy, updatedBy, createdAt, updatedAt, deletedAt.
-Indexes: organizationId + projectId, processingStatus, mimeType.
+Fields: organizationId, projectId, title, type, source, status, searchableText, aiSummary, storageKey, originalFileName, mimeType, sizeBytes, checksumSha256, processingError, extractedAt, chunkCount, createdBy, updatedBy, createdAt, updatedAt, deletedAt.
+Indexes: organizationId + updatedAt, organizationId + projectId, status.
 
 ### documentChunks
 
 Purpose: searchable document fragments.
-Fields: organizationId, documentId, projectId, chunkIndex, text, embedding, tokenCount, createdAt.
-Indexes: organizationId + documentId, vector index on embedding.
+Fields: organizationId, documentId, projectId, chunkIndex, content, characterCount, createdAt, updatedAt.
+Indexes: unique organizationId + documentId + chunkIndex, organizationId + projectId, compound organizationId + text index on content.
+
+Current implementation: normalized document text is split into overlapping 1,200-character chunks with a 180-character overlap. Tenant and optional project IDs are denormalized into each chunk so authorization filters are applied in the MongoDB query before results are returned. Embedding fields and an Atlas vector index will be added when semantic retrieval is introduced.
 
 ### decisions
 

@@ -53,8 +53,20 @@ npm run dev:start
 
 If your terminal is still using Node 16 or 18, switch to Node 20.19+ or 22.12+ before running the app.
 
-The API defaults to `http://localhost:4000`.
-The web app defaults to `http://localhost:5173`.
+The API defaults to `http://localhost:4000` and the web app to `http://localhost:5173`.
+If either port is already in use, `npm run dev:start` selects the next free port and prints the actual URLs without stopping the other application.
+
+### No-Cost Test Mode
+
+The default local configuration does not contact paid services or require payment details:
+
+- MongoDB runs from your existing local installation, or the optional Docker profile.
+- Redis and MinIO run locally in Docker on Novera-specific ports.
+- `AI_PROVIDER=mock` keeps assistant responses inside the application without an external AI API call.
+- Email, SMS, OAuth integrations, billing, and cloud storage are not activated.
+- Integration cards are a planned catalog only and cannot start external authorization.
+
+Keep `AI_API_KEY` empty while testing locally.
 
 To check or stop the local app:
 
@@ -64,6 +76,12 @@ npm run dev:stop
 ```
 
 Logs are written to `tmp/dev-logs`.
+
+You can also request explicit ports when needed:
+
+```bash
+API_PORT=4100 WEB_PORT=5180 npm run dev:start
+```
 
 To create demo database records in the Novera MongoDB database:
 
@@ -108,6 +126,11 @@ Useful endpoints:
 - `GET /api/v1/demo/workspace`
 - `POST /api/v1/demo/login`
 - `PATCH /api/v1/demo/profile`
+- `POST /api/v1/documents/upload`
+- `GET /api/v1/documents/search?query=...`
+- `POST /api/v1/documents/:documentId/reprocess`
+
+TXT and Markdown are extracted immediately. PDF and DOCX processing uses the local Redis-backed BullMQ worker. Extracted content is chunked and searchable in MongoDB without a paid AI or search provider.
 
 ## Frontend
 

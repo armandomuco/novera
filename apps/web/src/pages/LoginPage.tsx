@@ -81,6 +81,15 @@ export function LoginPage() {
               onChange={setPassword}
             />
 
+            <div className="text-right">
+              <Link
+                className="text-sm font-semibold text-teal hover:text-teal-700"
+                to="/forgot-password"
+              >
+                {t('forgotPassword')}
+              </Link>
+            </div>
+
             {message ? <p className="text-sm font-medium text-red-600">{message}</p> : null}
 
             <button

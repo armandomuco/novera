@@ -17,7 +17,7 @@ import { Response } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
 import { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/current-auth.decorator';
-import { CreateDocumentDto, UploadDocumentDto } from './documents.dto';
+import { CreateDocumentDto, SearchDocumentsDto, UploadDocumentDto } from './documents.dto';
 import { DocumentsService } from './documents.service';
 
 @ApiTags('documents')
@@ -41,6 +41,12 @@ export class DocumentsController {
     return this.documentsService.create(auth, body);
   }
 
+  @Get('search')
+  @ApiOkResponse({ description: 'Searches authorized document chunks in the active tenant.' })
+  searchDocuments(@CurrentAuth() auth: AuthContext, @Query() query: SearchDocumentsDto) {
+    return this.documentsService.search(auth, query);
+  }
+
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024 } }))
   @ApiConsumes('multipart/form-data')
@@ -51,6 +57,12 @@ export class DocumentsController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.documentsService.upload(auth, body, file);
+  }
+
+  @Post(':documentId/reprocess')
+  @ApiOkResponse({ description: 'Queues a stored tenant document for text reprocessing.' })
+  reprocessDocument(@CurrentAuth() auth: AuthContext, @Param('documentId') documentId: string) {
+    return this.documentsService.reprocess(auth, documentId);
   }
 
   @Get(':documentId/download')

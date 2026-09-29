@@ -36,12 +36,13 @@ Base path: `/api/v1`.
 - `GET /auth/invitations/:token`: validate a single-use invitation and return its public workspace details.
 - `POST /auth/invitations/accept`: accept as an existing user or create the invited account, then issue a tenant-scoped session.
 - `POST /auth/switch-organization`: validate membership, create a session for the selected organization, and revoke the previous session.
-- `POST /auth/password-reset/request`: send reset email. Public, rate limited.
-- `POST /auth/password-reset/confirm`: set new password. Public with reset token.
-- `POST /auth/email/verify`: verify email. Public with verification token.
+- `POST /auth/password-reset/request`: create a one-hour, single-use reset token without revealing whether the email exists. Public; production rate limiting remains required.
+- `POST /auth/password-reset/complete`: consume a reset token, hash the new password, and revoke every active session for the user.
+- `POST /auth/email-verification/request`: create a new 24-hour verification token for the authenticated user.
+- `POST /auth/email-verification/verify`: consume a verification token and mark the email verified.
 - `GET /auth/status`: returns auth module health. Public for MVP scaffolding.
 
-Current implementation note: register, login, refresh, logout, me, invitation acceptance, and organization switching are implemented with MongoDB-backed users, memberships, and sessions. Protected routes validate the underlying session as well as tenant membership. Password reset, email verification, and an audited JWT library remain planned.
+Current implementation note: register, login, refresh, logout, me, invitation acceptance, organization switching, email verification, and password reset are implemented with MongoDB-backed users, memberships, sessions, and hashed action tokens. JWT signing and verification use `jsonwebtoken` with HS256 and environment-specific secrets. Development responses may include a local preview link; production email delivery remains separate.
 
 ## Organizations
 
@@ -79,13 +80,10 @@ Current implementation note: invitation creation, cancellation, inspection, expi
 - `POST /documents/upload`: multipart upload for PDF, DOCX, TXT, and Markdown. Member+. Implemented with tenant validation, configurable size limits, extension/signature checks, SHA-256 checksum, malware-scanning hook, and S3-compatible storage.
 - `GET /documents/:documentId/download`: authenticated file download after document-level tenant membership validation. Implemented.
 - `GET /documents`: list tenant document metadata and processing state. Implemented.
-- `POST /organizations/:organizationId/documents`: upload. Member+. Validates type and size.
-- `GET /organizations/:organizationId/documents`: paginated list. Member+.
-- `GET /organizations/:organizationId/documents/:id`: metadata. Authorized access.
-- `GET /organizations/:organizationId/documents/:id/download`: signed URL. Authorized access.
-- `POST /organizations/:organizationId/documents/:id/reprocess`: queue processing. Manager+.
+- `GET /documents/search?query=...&projectId=...`: tenant-scoped full-text search over extracted chunks with source excerpts. Implemented.
+- `POST /documents/:documentId/reprocess`: requeue an authorized stored file after a processing failure. Member+. Implemented.
 
-Current implementation note: TXT and Markdown searchable text is extracted synchronously. PDF/DOCX extraction, BullMQ processing, chunk creation, AI summaries, and a production malware scanner remain planned.
+Current implementation note: TXT and Markdown are extracted synchronously. PDF and DOCX files are processed by a BullMQ worker with retries and failure state, and all extracted text is normalized, summarized locally, and split into tenant-scoped chunks. Vector embeddings, model-generated summaries, and a production malware scanner remain planned.
 
 ## AI Assistant
 
@@ -96,6 +94,8 @@ Current implementation note: TXT and Markdown searchable text is extracted synch
 ## Search
 
 - `POST /organizations/:organizationId/search`: hybrid search. Member+. Supports query, projectIds, types, tags, dateRange, pagination.
+
+Current implementation note: keyword search over document chunks is available through `GET /documents/search`. Unified metadata filters and semantic/vector ranking remain planned.
 
 ## Activity
 
@@ -114,9 +114,7 @@ These endpoints support the current local MVP demo while the production authenti
 - `POST /demo/knowledge-items`: creates a demo knowledge item and records activity. Public in local demo only.
 - `POST /demo/documents`: creates demo document metadata and records activity. Public in local demo only.
 
-These endpoints must be replaced by authenticated, tenant-checked production endpoints before a real launch.
-
-Frontend usage note: demo users with `@novera.test` still use these seeded demo endpoints. Non-demo users use the production `auth/me`, `projects`, `knowledge-items`, and `activity` endpoints for workspace loading and creation.
+These endpoints remain available for local fixture tooling, but the frontend now sends seeded and newly registered users through the same authenticated, tenant-checked production endpoints.
 
 ## Integrations
 

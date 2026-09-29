@@ -9,8 +9,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as jwt from 'jsonwebtoken';
 import { AcceptInvitationDto, LoginDto, RegisterDto, UpdateProfileDto } from './auth.dto';
 import {
+  AuthActionToken,
   AuthInvitation,
   AuthOrganization,
   AuthOrganizationMember,
@@ -38,6 +40,8 @@ export class AuthService {
     private readonly organizationMemberModel: Model<AuthOrganizationMember>,
     @InjectModel(AuthSession.name) private readonly sessionModel: Model<AuthSession>,
     @InjectModel(AuthInvitation.name) private readonly invitationModel: Model<AuthInvitation>,
+    @InjectModel(AuthActionToken.name)
+    private readonly actionTokenModel: Model<AuthActionToken>,
   ) {}
 
   getStatus() {
@@ -54,6 +58,8 @@ export class AuthService {
           'session persistence',
           'invitation acceptance',
           'organization switching',
+          'email verification',
+          'password reset',
         ],
       },
     };
@@ -96,7 +102,16 @@ export class AuthService {
       joinedAt: new Date(),
     });
 
-    return this.createSessionResponse(userId, organizationId, email, body.name, 'Owner');
+    const [session, verification] = await Promise.all([
+      this.createSessionResponse(userId, organizationId, email, body.name, 'Owner'),
+      this.createActionToken(userId, 'verify_email', 24 * 60 * 60),
+    ]);
+    return {
+      data: {
+        ...session.data,
+        verificationPreviewUrl: this.developmentPreviewUrl('/verify-email', verification),
+      },
+    };
   }
 
   async login(body: LoginDto) {
@@ -180,6 +195,75 @@ export class AuthService {
       }
     }
     return { data: { loggedOut: true } };
+  }
+
+  async requestPasswordReset(emailInput: string) {
+    const user = await this.userModel
+      .findOne({ email: emailInput.toLowerCase(), deletedAt: null })
+      .lean();
+    let previewUrl: string | undefined;
+    if (user) {
+      const token = await this.createActionToken(user._id, 'password_reset', 60 * 60);
+      previewUrl = this.developmentPreviewUrl('/reset-password', token);
+    }
+    return {
+      data: {
+        accepted: true,
+        message: 'If the account exists, password reset instructions have been created.',
+        ...(previewUrl ? { previewUrl } : {}),
+      },
+    };
+  }
+
+  async completePasswordReset(token: string, password: string) {
+    const action = await this.consumeActionToken(token, 'password_reset');
+    const passwordHash = this.hashPassword(password);
+    const user = await this.userModel.findOneAndUpdate(
+      { _id: action.userId, deletedAt: null },
+      { $set: { password: passwordHash, updatedAt: new Date() } },
+      { new: true },
+    );
+    if (!user) {
+      throw new BadRequestException('This password reset link is invalid or expired.');
+    }
+    await this.sessionModel.updateMany(
+      { userId: action.userId, revokedAt: null },
+      { $set: { revokedAt: new Date() } },
+    );
+    return { data: { passwordReset: true } };
+  }
+
+  async requestEmailVerification(auth: AuthContext) {
+    const user = await this.userModel
+      .findOne({ _id: new Types.ObjectId(auth.userId), deletedAt: null })
+      .lean();
+    if (!user) {
+      throw new UnauthorizedException('Session is no longer valid.');
+    }
+    if (user.emailVerifiedAt) {
+      return { data: { accepted: true, alreadyVerified: true } };
+    }
+    const token = await this.createActionToken(user._id, 'verify_email', 24 * 60 * 60);
+    const previewUrl = this.developmentPreviewUrl('/verify-email', token);
+    return {
+      data: {
+        accepted: true,
+        ...(previewUrl ? { previewUrl } : {}),
+      },
+    };
+  }
+
+  async verifyEmail(token: string) {
+    const action = await this.consumeActionToken(token, 'verify_email');
+    const user = await this.userModel.findOneAndUpdate(
+      { _id: action.userId, deletedAt: null },
+      { $set: { emailVerifiedAt: new Date(), updatedAt: new Date() } },
+      { new: true },
+    );
+    if (!user) {
+      throw new BadRequestException('This verification link is invalid or expired.');
+    }
+    return { data: { emailVerified: true } };
   }
 
   async me(authorization?: string) {
@@ -445,6 +529,53 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
+  private async createActionToken(
+    userId: Types.ObjectId,
+    type: 'verify_email' | 'password_reset',
+    lifetimeSeconds: number,
+  ) {
+    await this.actionTokenModel.updateMany(
+      { userId, type, usedAt: null },
+      { $set: { usedAt: new Date() } },
+    );
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.actionTokenModel.create({
+      userId,
+      type,
+      tokenHash: this.hashToken(token),
+      expiresAt: new Date(Date.now() + lifetimeSeconds * 1000),
+      usedAt: null,
+    });
+    return token;
+  }
+
+  private async consumeActionToken(token: string, type: 'verify_email' | 'password_reset') {
+    if (token.length < 32) {
+      throw new BadRequestException('This link is invalid or expired.');
+    }
+    const action = await this.actionTokenModel.findOneAndUpdate(
+      {
+        tokenHash: this.hashToken(token),
+        type,
+        usedAt: null,
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { usedAt: new Date() } },
+      { new: true },
+    );
+    if (!action) {
+      throw new BadRequestException('This link is invalid or expired.');
+    }
+    return action;
+  }
+
+  private developmentPreviewUrl(path: string, token: string) {
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      return undefined;
+    }
+    return `${this.configService.getOrThrow<string>('WEB_APP_URL')}${path}?token=${encodeURIComponent(token)}`;
+  }
+
   private async findUsableInvitation(token: string) {
     if (token.length < 32) {
       throw new NotFoundException('Invitation not found.');
@@ -465,10 +596,10 @@ export class AuthService {
   }
 
   private signToken(payload: TokenPayload) {
-    const header = this.base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-    const body = this.base64Url(JSON.stringify(payload));
-    const signature = this.sign(`${header}.${body}`, this.secretFor(payload.type));
-    return `${header}.${body}.${signature}`;
+    return jwt.sign(payload, this.secretFor(payload.type), {
+      algorithm: 'HS256',
+      noTimestamp: true,
+    });
   }
 
   private verifyAuthorization(authorization?: string) {
@@ -477,37 +608,17 @@ export class AuthService {
   }
 
   private verifyToken(token: string, type: 'access' | 'refresh') {
-    const [header, body, signature] = token.split('.');
-    if (!header || !body || !signature) {
-      throw new UnauthorizedException('Invalid token.');
-    }
-    const expected = this.sign(`${header}.${body}`, this.secretFor(type));
-    const signatureBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expected);
-    if (
-      signatureBuffer.length !== expectedBuffer.length ||
-      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
-    ) {
-      throw new UnauthorizedException('Invalid token.');
-    }
-    let payload: TokenPayload;
     try {
-      payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenPayload;
+      const payload = jwt.verify(token, this.secretFor(type), {
+        algorithms: ['HS256'],
+      }) as TokenPayload;
+      if (payload.type !== type) {
+        throw new UnauthorizedException('Invalid token.');
+      }
+      return payload;
     } catch {
-      throw new UnauthorizedException('Invalid token.');
-    }
-    if (payload.type !== type || payload.exp < this.expirySeconds(0)) {
       throw new UnauthorizedException('Token expired.');
     }
-    return payload;
-  }
-
-  private sign(value: string, secret: string) {
-    return crypto.createHmac('sha256', secret).update(value).digest('base64url');
-  }
-
-  private base64Url(value: string) {
-    return Buffer.from(value).toString('base64url');
   }
 
   private secretFor(type: 'access' | 'refresh') {

@@ -2,7 +2,7 @@
 
 ## Core Requirements
 
-- Argon2 or bcrypt password hashing.
+- Memory-hard password hashing. The MVP currently uses Node.js `scrypt` with a unique random salt per password.
 - Access tokens with short expiry.
 - Refresh token rotation and session revocation.
 - Rate limiting for auth and AI endpoints.
@@ -32,6 +32,10 @@
 
 Organization IDs from clients are routing hints only. The API must verify membership and role before any read or write.
 
+Email verification and password-reset tokens are random 256-bit values stored only as SHA-256 hashes. They expire, are single-use, and invalidate earlier unused tokens of the same type. Password reset revokes every active session for the account.
+
+Access and refresh JWTs are signed and verified by the audited `jsonwebtoken` library using HS256, explicit algorithm allow-listing, short access expiry, refresh rotation, and server-side session validation.
+
 ## Current Dependency Baseline
 
-As of 2026-09-01, `npm audit --omit=dev` reports zero known production vulnerabilities after safe transitive updates and the React Router v7.18.3 migration.
+As of 2026-09-25, `npm audit` reports zero known vulnerabilities after the NestJS/Multer, Vitest, React Router, and authentication dependency updates.
