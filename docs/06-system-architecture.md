@@ -35,7 +35,15 @@ NestJS modules expose REST controllers, DTO validation, service classes, reposit
 
 ## Frontend Architecture
 
-React with Vite, React Router, TanStack Query, Tailwind CSS, React Hook Form, Zod, and a professional component layer. The UI separates public routes, auth routes, onboarding, and authenticated app routes.
+React with Vite, React Router, Tailwind CSS, and lucide icons. The UI separates public routes, auth routes, and authenticated app routes (`/app/:section`).
+
+- `src/pages/`: route-level pages; `AppShell.tsx` is the authenticated layout and owns workspace loading and mutations.
+- `src/features/<area>/`: one folder per app screen (dashboard, assistant, projects, knowledge, documents, team, activity, profile, settings, integrations).
+- `src/components/`: shared UI pieces.
+- `src/i18n/`: language list, `translate`, and one dictionary per language; English defines the keys.
+- `src/api/`: API clients and shared response types.
+
+Planned: TanStack Query for server state, and React Hook Form with Zod for forms.
 
 ## Multi-Tenancy Rule
 

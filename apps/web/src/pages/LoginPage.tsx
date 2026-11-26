@@ -5,7 +5,7 @@ import { loginUser } from '../api/authApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import { PasswordField } from '../components/PasswordField';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);
@@ -143,12 +143,14 @@ export function LoginPage() {
             <div className="quiet-panel mt-6 rounded-ui p-4">
               <p className="text-sm font-bold text-slate-800">{t('demoAccessProcess')}</p>
               <div className="mt-4 grid gap-3">
-                {['demoProcessRequest', 'demoProcessApprove', 'demoProcessExpire'].map((item) => (
-                  <div key={item} className="flex gap-3">
-                    <CheckCircle2 className="mt-0.5 text-teal" size={17} aria-hidden="true" />
-                    <p className="text-sm leading-6 text-slate-600">{t(item)}</p>
-                  </div>
-                ))}
+                {(['demoProcessRequest', 'demoProcessApprove', 'demoProcessExpire'] as const).map(
+                  (item) => (
+                    <div key={item} className="flex gap-3">
+                      <CheckCircle2 className="mt-0.5 text-teal" size={17} aria-hidden="true" />
+                      <p className="text-sm leading-6 text-slate-600">{t(item)}</p>
+                    </div>
+                  ),
+                )}
               </div>
             </div>
           </div>

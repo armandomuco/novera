@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { requestDemo } from '../api/demoRequestApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 const companySizes = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
@@ -20,7 +20,7 @@ export function DemoRequestPage() {
   });
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);

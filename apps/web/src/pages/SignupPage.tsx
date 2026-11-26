@@ -5,7 +5,7 @@ import { registerUser } from '../api/authApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import { PasswordField } from '../components/PasswordField';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export function SignupPage() {
   const [email, setEmail] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [password, setPassword] = useState('');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);

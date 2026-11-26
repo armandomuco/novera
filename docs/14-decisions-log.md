@@ -113,3 +113,9 @@ Trade-offs: local demos now require the API, MongoDB, and `npm run seed:demo`, w
 Decision: use `@nestjs/throttler` as a global guard (120 requests per minute per IP) with a 10-per-minute limit on public credential, token, and demo-request endpoints. Swagger is disabled when `NODE_ENV=production`.
 
 Trade-offs: counters are kept in memory per API instance, so limits are per instance until a Redis-backed throttler store is added for multi-instance deployments.
+
+## 2026-11-26: Organize The Web App By Feature
+
+Decision: split the 2,200-line `AppShell.tsx` into one folder per screen under `apps/web/src/features/`, move shared pieces to `components/`, and move the five translation dictionaries out of the sample-data file into `apps/web/src/i18n/locales/`. `TranslationKey` is now the union of the English keys, so a missing or misspelled key in any language fails the type check. Each app screen has its own URL (`/app`, `/app/projects`, `/app/documents`, ...) served by one route with an optional `:section` segment, so the shell keeps its state while users navigate, and links, refresh, and the back button work.
+
+Trade-offs: `AppShell` still owns workspace loading and all mutations and passes them to views as props. Moving server state into TanStack Query is the next step and will let each feature load its own data. Production hosting must serve `index.html` for every `/app/*` path.

@@ -44,11 +44,11 @@ export class ActivityService {
       data: events.map((event) => ({
         id: event._id.toString(),
         organizationId: event.organizationId.toString(),
-        actorUserId: event.actorUserId.toString(),
+        actorUserId: event.actorUserId?.toString() ?? null,
         actorName: event.actorName ?? null,
         eventType: event.eventType,
         entityType: event.entityType,
-        entityId: event.entityId.toString(),
+        entityId: event.entityId?.toString() ?? null,
         entityName: event.entityName,
         metadata: event.metadata,
         createdAt: event.createdAt?.toISOString() ?? null,

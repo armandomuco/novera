@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import { languages } from '../data/demoWorkspace';
+import { languages } from '../i18n';
 
 type LanguageSelectorProps = {
   value: string;

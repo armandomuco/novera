@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../api/authApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -13,7 +13,7 @@ export function ForgotPasswordPage() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [message, setMessage] = useState('');
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);

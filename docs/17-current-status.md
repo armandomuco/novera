@@ -50,6 +50,7 @@ Last updated: 2026-09-29.
 - Active-tenant filters are applied inside project, knowledge, and document queries, with regression tests for cross-organization access.
 - Public and authenticated routes are loaded on demand; the initial JavaScript bundle was reduced from about 924 KB to about 239 KB, with Three.js isolated in a deferred chunk.
 - The local launcher automatically selects free API and web ports and updates the web proxy without stopping unrelated applications.
+- The web app is organized by feature (`src/features/*`), translations live in `src/i18n/locales/*` with compile-time key checking, and every app screen has its own URL.
 
 ## In Progress
 

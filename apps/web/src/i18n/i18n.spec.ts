@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { languages, translate, translations } from './demoWorkspace';
+import { languages, translate, translations } from '.';
 
 describe('workspace translations', () => {
   it('keeps every supported language aligned with the English dictionary', () => {

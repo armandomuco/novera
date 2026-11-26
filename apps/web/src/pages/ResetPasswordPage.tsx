@@ -4,7 +4,7 @@ import { completePasswordReset } from '../api/authApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import { PasswordField } from '../components/PasswordField';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -14,7 +14,7 @@ export function ResetPasswordPage() {
   const [complete, setComplete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);

@@ -4,13 +4,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../api/authApi';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   useEffect(() => {
     const token = searchParams.get('token') ?? '';

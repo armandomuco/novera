@@ -5,7 +5,7 @@ import { acceptInvitation, getInvitationDetails, InvitationDetails } from '../ap
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import { PasswordField } from '../components/PasswordField';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
 export function AcceptInvitationPage() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export function AcceptInvitationPage() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   useEffect(() => {
     if (!token) {

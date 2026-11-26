@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { KnowledgeTwinCanvas } from '../components/KnowledgeTwinCanvas';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
-import { translate } from '../data/demoWorkspace';
+import { translate, type TranslationKey } from '../i18n';
 
-const proofPoints = [
+const proofPoints: Array<{ labelKey: TranslationKey; icon: typeof ShieldCheck }> = [
   { labelKey: 'permissionAwareAnswers', icon: ShieldCheck },
   { labelKey: 'documentDecisionMemory', icon: FileSearch },
   { labelKey: 'connectedProjectContext', icon: Network },
@@ -15,7 +15,7 @@ const proofPoints = [
 
 export function LandingPage() {
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
-  const t = (key: string) => translate(language, key);
+  const t = (key: TranslationKey) => translate(language, key);
 
   function changeLanguage(value: string) {
     setLanguage(value);

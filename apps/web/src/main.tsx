@@ -50,7 +50,7 @@ const router = createBrowserRouter([
   { path: '/accept-invitation', element: <AcceptInvitationPage /> },
   { path: '/request-demo', element: <DemoRequestPage /> },
   { path: '/pricing', element: <PricingPage /> },
-  { path: '/app', element: <AppShell /> },
+  { path: '/app/:section?', element: <AppShell /> },
 ]);
 
 export function RouteLoadingState() {
