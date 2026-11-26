@@ -22,8 +22,10 @@ Last updated: 2026-09-29.
 - Normalized, overlapping, tenant-scoped document chunks and deterministic local summaries.
 - Authorized MongoDB keyword search over document content with source excerpts and download links.
 - Document processing UI with automatic status refresh, indexed-section counts, errors, and retry controls.
-- Production dependency audit currently reports zero known vulnerabilities; NestJS is aligned on 11.2.6, Multer is pinned to patched 2.4.0, and Vitest is on 5.0.2.
-- Demo workspace seed and demo API endpoints for projects, knowledge items, documents, profile update, and workspace loading.
+- NestJS is aligned on 11.2.6, Multer is pinned to patched 2.4.0, and Vitest is on 5.0.2. A production dependency audit on 2026-11-26 reports new advisories (including mongoose and body-parser) that still need upgrades.
+- Demo workspace seed; seeded users sign in through the normal authenticated APIs (the unauthenticated `/demo` API was removed).
+- Rate limiting on all routes, with stricter limits on public credential, token, and demo-request endpoints.
+- Swagger API docs are served only outside production.
 - Activity timeline API.
 - Public demo-request storage with a 5-day expiration policy.
 - Seeded and newly registered users use the same authenticated, tenant-scoped production APIs.

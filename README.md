@@ -123,9 +123,7 @@ Useful endpoints:
 - `GET /api/v1/health`
 - `GET /api/v1/auth/status`
 - `GET /api/v1/organizations/status`
-- `GET /api/v1/demo/workspace`
-- `POST /api/v1/demo/login`
-- `PATCH /api/v1/demo/profile`
+- `POST /api/v1/auth/login`
 - `POST /api/v1/documents/upload`
 - `GET /api/v1/documents/search?query=...`
 - `POST /api/v1/documents/:documentId/reprocess`

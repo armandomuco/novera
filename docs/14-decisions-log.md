@@ -101,3 +101,15 @@ Trade-offs: this adds a small dependency but removes custom cryptographic token 
 Decision: use local PDF and DOCX extraction, deterministic extractive summaries, BullMQ with Redis, and tenant-scoped MongoDB text indexes for the first production document pipeline. TXT and Markdown stay synchronous; binary document extraction runs in a retryable background worker.
 
 Trade-offs: the MVP gains real searchable documents without paid APIs, but keyword ranking is less flexible than hybrid vector search and local summaries are not abstractive. Provider-independent embeddings and model-generated answers will be layered on only after authorization, citation, and evaluation coverage are in place.
+
+## 2026-11-26: Remove The Unauthenticated Demo API
+
+Decision: delete the `/demo` API module. It wrote to the same `users`, `organizations`, and `projects` collections as the production modules without authentication, so anyone could rename any user by email or add records to the demo organization. Seeded demo users already sign in through `/auth` and use the tenant-checked production endpoints.
+
+Trade-offs: local demos now require the API, MongoDB, and `npm run seed:demo`, which was already the case for the frontend.
+
+## 2026-11-26: Rate Limit The API
+
+Decision: use `@nestjs/throttler` as a global guard (120 requests per minute per IP) with a 10-per-minute limit on public credential, token, and demo-request endpoints. Swagger is disabled when `NODE_ENV=production`.
+
+Trade-offs: counters are kept in memory per API instance, so limits are per instance until a Redis-backed throttler store is added for multi-instance deployments.

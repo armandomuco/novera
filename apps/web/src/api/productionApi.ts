@@ -1,6 +1,6 @@
 import { demoUsers, risks } from '../data/demoWorkspace';
 import { authenticatedFetch, getStoredAuth } from './authApi';
-import { WorkspaceData } from './demoApi';
+import { WorkspaceData } from './workspaceTypes';
 
 type ApiResponse<T> = {
   data: T;

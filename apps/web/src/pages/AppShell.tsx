@@ -36,7 +36,7 @@ import {
   switchOrganization,
   updateCurrentUser,
 } from '../api/authApi';
-import { ApiUser, WorkspaceData } from '../api/demoApi';
+import { ApiUser, WorkspaceData } from '../api/workspaceTypes';
 import {
   archiveProductionKnowledgeItem,
   archiveProductionProject,

@@ -12,6 +12,7 @@ import {
   UpdateProfileDto,
   VerifyEmailDto,
 } from './auth.dto';
+import { SensitiveRateLimit } from '../common/rate-limit';
 import { AuthGuard } from './auth.guard';
 import { CurrentAuth } from './current-auth.decorator';
 import { AuthService } from './auth.service';
@@ -29,12 +30,14 @@ export class AuthController {
   }
 
   @Post('register')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Registers a user, creates an organization, and returns tokens.' })
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
   }
 
   @Post('login')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Authenticates a user and returns tokens.' })
   login(@Body() body: LoginDto) {
     return this.authService.login(body);
@@ -53,18 +56,21 @@ export class AuthController {
   }
 
   @Post('password-reset/request')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Creates a short-lived password reset request.' })
   requestPasswordReset(@Body() body: RequestPasswordResetDto) {
     return this.authService.requestPasswordReset(body.email);
   }
 
   @Post('password-reset/complete')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Consumes a password reset token and revokes active sessions.' })
   completePasswordReset(@Body() body: CompletePasswordResetDto) {
     return this.authService.completePasswordReset(body.token, body.password);
   }
 
   @Post('email-verification/verify')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Consumes an email verification token.' })
   verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
@@ -93,6 +99,7 @@ export class AuthController {
   }
 
   @Get('invitations/:token')
+  @SensitiveRateLimit()
   @ApiOkResponse({
     description: 'Validates an invitation link and returns its public workspace details.',
   })
@@ -101,6 +108,7 @@ export class AuthController {
   }
 
   @Post('invitations/accept')
+  @SensitiveRateLimit()
   @ApiOkResponse({ description: 'Accepts an invitation and creates a tenant-scoped session.' })
   acceptInvitation(@Body() body: AcceptInvitationDto) {
     return this.authService.acceptInvitation(body);

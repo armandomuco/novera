@@ -1,4 +1,4 @@
-import { ApiUser } from './demoApi';
+import { ApiUser } from './workspaceTypes';
 
 export type AuthPayload = {
   user: ApiUser;

@@ -103,18 +103,13 @@ Current implementation note: keyword search over document chunks is available th
 
 Current implementation note: project create/update/archive and knowledge create/update/archive record activity events.
 
-## Demo
+## Demo Workspace
 
-These endpoints support the current local MVP demo while the production authentication and tenant modules are being built.
+There are no separate demo endpoints. `npm run seed:demo` writes the Acme Studio organization, members, and sample records into MongoDB, and the seeded `@novera.test` users sign in through the normal `/auth` endpoints with the same tenant and role checks as every other account.
 
-- `GET /demo/workspace`: returns the seeded Acme Studio workspace from MongoDB. Public in local demo only.
-- `POST /demo/login`: returns a seeded demo user by email. Public in local demo only.
-- `PATCH /demo/profile`: updates a seeded demo user's display name. Public in local demo only.
-- `POST /demo/projects`: creates a demo project and records activity. Public in local demo only.
-- `POST /demo/knowledge-items`: creates a demo knowledge item and records activity. Public in local demo only.
-- `POST /demo/documents`: creates demo document metadata and records activity. Public in local demo only.
+## Rate Limiting
 
-These endpoints remain available for local fixture tooling, but the frontend now sends seeded and newly registered users through the same authenticated, tenant-checked production endpoints.
+Every route is limited to 120 requests per minute per client IP. Unauthenticated endpoints that check credentials, consume tokens, or create records (`register`, `login`, password reset, email verification, invitation lookup and acceptance, and demo requests) are limited to 10 requests per minute. Limited requests return HTTP 429. Set `TRUST_PROXY_HOPS` when the API runs behind a load balancer so limits apply to the real client IP.
 
 ## Integrations
 

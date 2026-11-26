@@ -11,6 +11,7 @@ const environmentSchema = z.object({
   AI_PROVIDER: z.literal('mock').default('mock'),
   AI_API_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().optional(),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
   WEB_APP_URL: z.string().url().default('http://localhost:5173'),
   S3_ENDPOINT: z.string().url().default('http://localhost:9010'),
   S3_REGION: z.string().min(1).default('us-east-1'),

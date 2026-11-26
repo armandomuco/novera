@@ -10,6 +10,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
   const config = app.get(ConfigService);
 
+  // Behind a load balancer or reverse proxy, rate limiting must see the real client IP.
+  const trustProxy = config.get<number>('TRUST_PROXY_HOPS');
+  if (trustProxy) {
+    app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
+  }
+
   app.setGlobalPrefix('api');
   app.enableVersioning({
     type: VersioningType.URI,
@@ -28,14 +34,16 @@ async function bootstrap() {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Novera API')
-    .setDescription('API for the Novera AI Digital Twin for Businesses MVP.')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  if (config.get<string>('NODE_ENV') !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Novera API')
+      .setDescription('API for the Novera AI Digital Twin for Businesses MVP.')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(config.get<number>('API_PORT') ?? 4000);
 }
