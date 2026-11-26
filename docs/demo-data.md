@@ -47,7 +47,7 @@ Expected seed output:
     "organizations": 1,
     "organizationMembers": 5,
     "projects": 3,
-    "knowledgeItems": 4,
+    "knowledgeItems": 6,
     "documents": 3,
     "risks": 2,
     "activityEvents": 4
@@ -63,8 +63,9 @@ The script creates or updates these collections:
 - `projects`
 - `knowledgeItems`
 - `documents`
-- `risks`
 - `activityEvents`
+
+It also removes records the older seed wrote to the unused `risks` collection for the demo organization.
 
 It does not delete or modify other databases.
 
@@ -72,11 +73,13 @@ The demo user field is named `password`. The seed script stores a hashed scrypt 
 
 ## Demo Projects
 
-| Project          | Status   | Risk   | Owner       | Summary                                                |
-| ---------------- | -------- | ------ | ----------- | ------------------------------------------------------ |
-| Atlas onboarding | Delayed  | High   | Mira Chen   | Blocked by missing CRM export credentials.             |
-| Q3 retainer      | On track | Medium | Adrian Vale | Scope is almost approved; staffing needs confirmation. |
-| Finance portal   | Review   | Low    | Leo Marin   | Requirements are under review; permissions are next.   |
+| Project          | Status   | Risk   | Owner       | Due                | Progress | Summary                                                |
+| ---------------- | -------- | ------ | ----------- | ------------------ | -------- | ------------------------------------------------------ |
+| Atlas onboarding | Delayed  | High   | Mira Chen   | 2 days before seed | 62%      | Blocked by missing CRM export credentials.             |
+| Q3 retainer      | On track | Medium | Adrian Vale | 5 days after seed  | 78%      | Scope is almost approved; staffing needs confirmation. |
+| Finance portal   | Review   | Low    | Leo Marin   | 30 days after seed | 44%      | Requirements are under review; permissions are next.   |
+
+Due dates are relative to the day the seed runs, so the dashboard always shows one overdue project, one due soon, and one on schedule. Re-run the seed to reset them.
 
 ## Demo Knowledge
 
@@ -97,7 +100,9 @@ The demo user field is named `password`. The seed script stores a hashed scrypt 
 
 ## Demo Risks
 
-| Risk                                 | Severity | Owner       | Mitigation                                                         |
-| ------------------------------------ | -------- | ----------- | ------------------------------------------------------------------ |
-| CRM export credentials still missing | High     | Mira Chen   | Escalate to customer sponsor and prepare fallback CSV import path. |
-| Staffing overlap during Q3 delivery  | Medium   | Adrian Vale | Confirm allocation before final retainer approval.                 |
+Seeded as knowledge items of type `risk`, so the assistant can search them and the dashboard lists them alongside project-derived risks.
+
+| Risk                                       | Project          | Owner       | Mitigation                                                    |
+| ------------------------------------------ | ---------------- | ----------- | ------------------------------------------------------------- |
+| Risk: CRM export credentials still missing | Atlas onboarding | Mira Chen   | Escalate to customer sponsor and prepare a fallback CSV path. |
+| Risk: staffing overlap during Q3 delivery  | Q3 retainer      | Adrian Vale | Confirm allocation before final scope approval.               |

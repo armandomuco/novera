@@ -41,7 +41,7 @@ export class ProjectsService {
       riskLevel: body.riskLevel ?? 'Medium',
       ownerName: body.ownerName,
       dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
-      progress: 0,
+      progress: body.progress ?? 0,
       objectives: body.objectives ?? [],
       createdBy: userId,
       updatedBy: userId,
@@ -148,7 +148,10 @@ export class ProjectsService {
       ...(body.status !== undefined ? { status: body.status } : {}),
       ...(body.riskLevel !== undefined ? { riskLevel: body.riskLevel } : {}),
       ...(body.ownerName !== undefined ? { ownerName: body.ownerName } : {}),
-      ...(body.dueDate !== undefined ? { dueDate: new Date(body.dueDate) } : {}),
+      ...(body.dueDate !== undefined
+        ? { dueDate: body.dueDate === null ? null : new Date(body.dueDate) }
+        : {}),
+      ...(body.progress !== undefined ? { progress: body.progress } : {}),
       ...(body.objectives !== undefined ? { objectives: body.objectives } : {}),
     };
   }
@@ -162,7 +165,8 @@ export class ProjectsService {
       riskLevel: project.riskLevel,
       ownerName: project.ownerName ?? null,
       dueDate: project.dueDate?.toISOString() ?? null,
-      progress: project.progress,
+      // Records created before progress was stored have no value; report them as not started.
+      progress: project.progress ?? 0,
       description: project.description,
       objectives: project.objectives,
       createdAt: project.createdAt?.toISOString() ?? null,

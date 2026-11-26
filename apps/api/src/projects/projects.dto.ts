@@ -2,10 +2,13 @@ import {
   IsArray,
   IsDateString,
   IsIn,
+  IsInt,
   IsMongoId,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -52,6 +55,12 @@ export class CreateProjectDto {
   dueDate?: string;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  progress?: number;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   objectives?: string[];
@@ -82,9 +91,16 @@ export class UpdateProjectDto {
   @MaxLength(120)
   ownerName?: string;
 
+  /** An ISO date, or null to clear the due date. */
   @IsOptional()
   @IsDateString()
-  dueDate?: string;
+  dueDate?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  progress?: number;
 
   @IsOptional()
   @IsArray()

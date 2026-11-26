@@ -22,14 +22,16 @@ Last updated: 2026-09-29.
 - Normalized, overlapping, tenant-scoped document chunks and deterministic local summaries.
 - Authorized MongoDB keyword search over document content with source excerpts and download links.
 - Document processing UI with automatic status refresh, indexed-section counts, errors, and retry controls.
-- NestJS is aligned on 11.2.6, Multer is pinned to patched 2.4.0, and Vitest is on 5.0.2. A production dependency audit on 2026-11-26 reports new advisories (including mongoose and body-parser) that still need upgrades.
+- Production dependency audit reports zero known vulnerabilities (2026-11-26): mongoose 8.24.11 (one copy, enforced by a root override), Multer override 2.5.0, Zod 4, @nestjs/swagger 11.4.8, Vite 8.4. Eight moderate advisories remain in development-only tooling (`@nestjs/cli` 11 and `@typescript-eslint` 7 via glob/minimatch) and need major tooling upgrades.
+- Seeded demo projects include progress values, and the API reports 0 for project records stored without one.
+- Dashboard on production data (`GET /api/v1/dashboard`): risks from overdue, delayed, and high-risk projects plus knowledge items of type risk; priorities from overdue, at-risk, and due-soon projects and decisions from the last 14 days; honest empty states. Project cards edit status, risk level, due date, and progress.
 - Demo workspace seed; seeded users sign in through the normal authenticated APIs (the unauthenticated `/demo` API was removed).
 - Rate limiting on all routes, with stricter limits on public credential, token, and demo-request endpoints.
 - Swagger API docs are served only outside production.
 - Activity timeline API.
 - Public demo-request storage with a 5-day expiration policy.
 - Seeded and newly registered users use the same authenticated, tenant-scoped production APIs.
-- Workspace-grounded assistant behavior that refuses to answer when there is not enough visible information.
+- Server-side grounded assistant (`POST /api/v1/assistant/ask`): tenant-scoped retrieval over documents, knowledge items, and projects; provider adapter with a local mock; validated citations; computed confidence and missing terms; audit records without prompt text; per-IP rate limit. The UI shows cited sources, confidence, and an honest no-evidence state.
 - Language selector and broad UI translation coverage.
 - Professional UI polish, first-workspace empty states, password visibility controls, profile page, logout button, and improved 3D knowledge map.
 - Responsive mobile navigation with access to every application module, profile, and logout.
@@ -56,7 +58,6 @@ Last updated: 2026-09-29.
 
 - Authentication hardening.
 - Resource-level permissions beyond the current role model.
-- Dashboard production data coverage.
 - Production-grade file safety scanning and document observability.
 - Semantic and assistant retrieval architecture beyond implemented keyword document search.
 - Repeatable automated browser regression suite.
@@ -67,8 +68,8 @@ Last updated: 2026-09-29.
 - Extend the current role-based controls with item-level sharing and resource-level permissions.
 - Add production malware scanning and richer processing metrics.
 - Add metadata filters and semantic/vector ranking to the implemented keyword search.
-- Add provider-independent AI service implementation, embeddings, prompt versioning, token tracking, source citations, and prompt-injection defenses.
-- Connect dashboard risks, priorities, unanswered questions, overdue items, and suggested priorities to production data.
+- Add a hosted-model adapter behind the assistant provider interface, then embeddings and hybrid ranking.
+- Add a dedicated risk record (severity, likelihood, owner, status) if teams need to track risks to closure, and "unanswered questions" from assistant no-evidence results.
 - Add real integrations after core documents/search/AI are stable.
 - Expand integration and end-to-end coverage for invitations, document storage, browser workflows, and AI retrieval.
 - Add CI pipeline and deployment configuration.
@@ -76,8 +77,6 @@ Last updated: 2026-09-29.
 
 ## Next Recommended Work
 
-1. Add production dashboard endpoints for risks, overdue work, and priorities.
-2. Replace the remaining dashboard sample panels with real API data and honest empty states.
-3. Add browser-level authentication, document processing, CRUD, translation, and permission regression tests.
-4. Add provider-independent embeddings and hybrid ranking tests.
-5. Connect an email delivery abstraction for production invitation links.
+1. Add browser-level authentication, document processing, CRUD, dashboard, translation, and permission regression tests.
+2. Add provider-independent embeddings and hybrid ranking tests.
+3. Connect an email delivery abstraction for production invitation links.

@@ -90,9 +90,9 @@ Indexes: organizationId + name.
 
 ### risks
 
-Purpose: risk tracking.
-Fields: organizationId, projectId, title, severity, likelihood, status, mitigation, sourceIds, ownerId, createdAt, updatedAt.
-Indexes: organizationId + status, severity.
+Not implemented. Risks are currently knowledge items of type `risk` plus project-derived risks (overdue, delayed, or high-risk projects) computed by `GET /api/v1/dashboard`. A dedicated collection with severity, likelihood, owner, and status is planned for when teams need to track risks through to closure.
+Planned fields: organizationId, projectId, title, severity, likelihood, status, mitigation, sourceIds, ownerId, createdAt, updatedAt.
+Planned indexes: organizationId + status, severity.
 
 ### activityEvents
 

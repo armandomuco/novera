@@ -1,6 +1,6 @@
-import { demoUsers, risks } from '../data/demoWorkspace';
+import { demoUsers } from '../data/demoWorkspace';
 import { authenticatedFetch, getStoredAuth } from './authApi';
-import { WorkspaceData } from './workspaceTypes';
+import type { DashboardInsights, ProjectUpdate, WorkspaceData } from './workspaceTypes';
 
 type ApiResponse<T> = {
   data: T;
@@ -69,6 +69,29 @@ export type DocumentSearchResult = {
   sourceUrl: string;
 };
 
+export type AssistantConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export type AssistantSource = {
+  id: string;
+  kind: 'document' | 'knowledge' | 'project';
+  entityId: string;
+  title: string;
+  excerpt: string;
+  projectName: string | null;
+  url: string | null;
+};
+
+export type AssistantAnswer = {
+  /** Null when the workspace has no records that answer the question. */
+  answer: string | null;
+  confidence: AssistantConfidence;
+  sources: AssistantSource[];
+  /** Question words no cited source mentions. */
+  missingTerms: string[];
+  provider: string;
+  model: string;
+};
+
 type ApiMember = {
   id: string;
   name: string;
@@ -94,7 +117,7 @@ export function hasAuthenticatedSession() {
 }
 
 export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
-  const [me, organizations, projects, knowledgeItems, documents, activityEvents] =
+  const [me, organizations, projects, knowledgeItems, documents, activityEvents, dashboard] =
     await Promise.all([
       get<ApiResponse<{ organization: ApiOrganization }>>('/api/v1/auth/me'),
       get<ApiResponse<ApiOrganizationMembership[]>>('/api/v1/organizations'),
@@ -102,6 +125,7 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       get<ApiResponse<ApiKnowledgeItem[]>>('/api/v1/knowledge-items'),
       get<ApiResponse<ApiDocument[]>>('/api/v1/documents'),
       get<ApiResponse<ApiActivity[]>>('/api/v1/activity'),
+      get<ApiResponse<DashboardInsights>>('/api/v1/dashboard'),
     ]);
   const [members, invitations] = await Promise.all([
     get<ApiResponse<ApiMember[]>>(`/api/v1/organizations/${me.data.organization.id}/members`),
@@ -128,7 +152,7 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       status: project.status,
       risk: project.riskLevel,
       owner: project.ownerName ?? auth?.user.name ?? 'Unassigned',
-      due: project.dueDate ?? 'No due date',
+      dueDate: project.dueDate,
       progress: project.progress,
       summary: project.description,
       objectives: project.objectives,
@@ -155,7 +179,7 @@ export async function fetchProductionWorkspace(): Promise<WorkspaceData> {
       processingError: document.processingError,
       chunkCount: document.chunkCount,
     })),
-    risks: risks.slice(0, 0),
+    dashboard: dashboard.data,
     activities: activityEvents.data.map((event) => ({
       id: event.id,
       actor: event.actorName ?? 'System',
@@ -216,14 +240,15 @@ export async function createProductionProject(input: {
   return fetchProductionWorkspace();
 }
 
-export async function updateProductionProject(
-  projectId: string,
-  input: { name: string; owner: string; summary: string },
-): Promise<WorkspaceData> {
-  await requestMutation(`/api/v1/projects/${projectId}`, 'PATCH', {
+export async function updateProductionProject(input: ProjectUpdate): Promise<WorkspaceData> {
+  await requestMutation(`/api/v1/projects/${input.id}`, 'PATCH', {
     name: input.name,
     ownerName: input.owner,
     description: input.summary,
+    status: input.status,
+    riskLevel: input.risk,
+    dueDate: input.dueDate || null,
+    progress: input.progress,
   });
   return fetchProductionWorkspace();
 }
@@ -302,6 +327,10 @@ export async function searchProductionDocuments(query: string) {
     `/api/v1/documents/search?query=${encodeURIComponent(query)}`,
   );
   return response.data;
+}
+
+export async function askProductionAssistant(input: { question: string; language: string }) {
+  return mutation<AssistantAnswer>('/api/v1/assistant/ask', input);
 }
 
 export async function reprocessProductionDocument(documentId: string): Promise<WorkspaceData> {

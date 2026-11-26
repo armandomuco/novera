@@ -127,6 +127,8 @@ Useful endpoints:
 - `POST /api/v1/documents/upload`
 - `GET /api/v1/documents/search?query=...`
 - `POST /api/v1/documents/:documentId/reprocess`
+- `POST /api/v1/assistant/ask`
+- `GET /api/v1/dashboard`
 
 TXT and Markdown are extracted immediately. PDF and DOCX processing uses the local Redis-backed BullMQ worker. Extracted content is chunked and searchable in MongoDB without a paid AI or search provider.
 

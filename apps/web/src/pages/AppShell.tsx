@@ -14,12 +14,13 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { clearAuth, switchOrganization, updateCurrentUser } from '../api/authApi';
 import {
   archiveProductionKnowledgeItem,
   archiveProductionProject,
+  askProductionAssistant,
   cancelProductionInvitation,
   createProductionInvitation,
   createProductionKnowledgeItem,
@@ -34,7 +35,8 @@ import {
   updateProductionProject,
   uploadProductionDocument,
 } from '../api/productionApi';
-import type { WorkspaceData } from '../api/workspaceTypes';
+import type { AssistantAnswer } from '../api/productionApi';
+import type { ProjectUpdate, WorkspaceData } from '../api/workspaceTypes';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Logo } from '../components/Logo';
 import {
@@ -44,11 +46,9 @@ import {
   getDemoUserByEmail,
   knowledgeItems,
   projects,
-  risks,
 } from '../data/demoWorkspace';
 import { ActivityView } from '../features/activity/ActivityView';
 import { AssistantView } from '../features/assistant/AssistantView';
-import { generateWorkspaceAnswer } from '../features/assistant/generateWorkspaceAnswer';
 import { DashboardView } from '../features/dashboard/DashboardView';
 import { DocumentsView } from '../features/documents/DocumentsView';
 import { IntegrationsView } from '../features/integrations/IntegrationsView';
@@ -104,7 +104,9 @@ export function AppShell() {
   const [language, setLanguage] = useState(window.localStorage.getItem('novera-language') ?? 'en');
   const [query, setQuery] = useState('');
   const [assistantQuestion, setAssistantQuestion] = useState('');
-  const [assistantAnswer, setAssistantAnswer] = useState('');
+  const [assistantAnswer, setAssistantAnswer] = useState<AssistantAnswer | null>(null);
+  const [isAsking, setIsAsking] = useState(false);
+  const latestQuestionRef = useRef(0);
   const [currentUser, setCurrentUser] = useState(getStoredUser);
   const [notice, setNotice] = useState('');
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
@@ -167,7 +169,7 @@ export function AppShell() {
     projects,
     knowledgeItems,
     documents,
-    risks,
+    dashboard: null,
     activities,
     source: 'fallback' as const,
   };
@@ -210,7 +212,7 @@ export function AppShell() {
     setLanguage(value);
     window.localStorage.setItem('novera-language', value);
     setAssistantQuestion('');
-    setAssistantAnswer('');
+    setAssistantAnswer(null);
     showNotice(`${translate(value, 'languageChanged')}: ${value.toUpperCase()}`);
   }
 
@@ -224,10 +226,23 @@ export function AppShell() {
     showNotice(data.source === 'api' ? message : `${message} locally`);
   }
 
-  function askAssistant(question: string) {
+  async function askAssistant(question: string) {
+    const trimmed = question.trim();
     setAssistantQuestion(question);
-    setAssistantAnswer(generateWorkspaceAnswer(question, workspaceData, t));
     navigate(viewPath('Assistant'));
+    if (!trimmed) return;
+    // Only the most recent question may update the answer, even if an earlier one returns later.
+    const requestId = ++latestQuestionRef.current;
+    setIsAsking(true);
+    setAssistantAnswer(null);
+    try {
+      const answer = await askProductionAssistant({ question: trimmed, language });
+      if (requestId === latestQuestionRef.current) setAssistantAnswer(answer);
+    } catch {
+      if (requestId === latestQuestionRef.current) showNotice(t('assistantAskFailed'));
+    } finally {
+      if (requestId === latestQuestionRef.current) setIsAsking(false);
+    }
   }
 
   function logout() {
@@ -264,14 +279,9 @@ export function AppShell() {
     }
   }
 
-  async function updateProject(input: {
-    id: string;
-    name: string;
-    owner: string;
-    summary: string;
-  }) {
+  async function updateProject(input: ProjectUpdate) {
     try {
-      const data = await updateProductionProject(input.id, input);
+      const data = await updateProductionProject(input);
       replaceWorkspace(data, t('projectUpdated'));
       return true;
     } catch {
@@ -602,7 +612,7 @@ export function AppShell() {
             <button
               className="primary-action inline-flex h-10 items-center gap-2 rounded-ui px-4 text-sm font-semibold text-white"
               type="button"
-              onClick={() => askAssistant('What should management focus on this week?')}
+              onClick={() => askAssistant(t('assistantQuestionFocus'))}
             >
               <Bot size={17} aria-hidden="true" />
               {t('askNovera')}
@@ -627,8 +637,9 @@ export function AppShell() {
           ) : activeView === 'Assistant' ? (
             <AssistantView
               answer={assistantAnswer}
-              data={workspaceData}
+              isAsking={isAsking}
               onAsk={askAssistant}
+              onDownloadDocument={downloadDocument}
               question={assistantQuestion}
               setQuestion={setAssistantQuestion}
               t={t}

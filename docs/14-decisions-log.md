@@ -119,3 +119,15 @@ Trade-offs: counters are kept in memory per API instance, so limits are per inst
 Decision: split the 2,200-line `AppShell.tsx` into one folder per screen under `apps/web/src/features/`, move shared pieces to `components/`, and move the five translation dictionaries out of the sample-data file into `apps/web/src/i18n/locales/`. `TranslationKey` is now the union of the English keys, so a missing or misspelled key in any language fails the type check. Each app screen has its own URL (`/app`, `/app/projects`, `/app/documents`, ...) served by one route with an optional `:section` segment, so the shell keeps its state while users navigate, and links, refresh, and the back button work.
 
 Trade-offs: `AppShell` still owns workspace loading and all mutations and passes them to views as props. Moving server state into TanStack Query is the next step and will let each feature load its own data. Production hosting must serve `index.html` for every `/app/*` path.
+
+## 2026-11-26: Ground The Assistant On The Server
+
+Decision: replace the browser-side keyword assistant with `POST /api/v1/assistant/ask`. The API checks membership, retrieves sources from the active organization only, passes them to a provider adapter as a structured list, keeps only citations to supplied sources, computes confidence itself, and records an audit entry without the question or answer text. The local mock provider quotes matching source sentences, so the feature stays free and offline until a hosted model is chosen.
+
+Trade-offs: mock answers are extracts rather than written prose, and keyword ranking misses synonyms. Both improve by adding a hosted-model adapter and embeddings behind the existing interfaces without changing the endpoint or the UI.
+
+## 2026-11-26: Derive Dashboard Risks And Priorities
+
+Decision: add `GET /api/v1/dashboard`, which computes risks and priorities on each request from data teams already maintain: project status, risk level, due date, and progress, plus knowledge items of type `risk` and `decision`. Overdue, delayed, and high-risk projects become risks; priorities are overdue projects, then delayed or high-risk ones, then projects due within 7 days, then decisions from the last 14 days. Project cards can now edit status, risk level, due date, and progress so these signals can be kept current. The dashboard's fixed sample priorities and the always-empty risk panel are gone. The seed writes its risks as knowledge items and uses due dates relative to the seed day.
+
+Trade-offs: there is no dedicated risk record with severity, likelihood, owner, and status, so a recorded risk is closed by archiving its knowledge item. A `risks` module can be added later without changing the dashboard response shape. The rules are fixed in code rather than configurable per organization.

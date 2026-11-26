@@ -10,3 +10,6 @@ export const DEFAULT_RATE_LIMIT = { name: 'default', ttl: ONE_MINUTE_MS, limit: 
  * or create records, to slow down password guessing and token enumeration.
  */
 export const SensitiveRateLimit = () => Throttle({ default: { ttl: ONE_MINUTE_MS, limit: 10 } });
+
+/** Assistant questions run retrieval and, with a hosted provider, a paid model call. */
+export const AssistantRateLimit = () => Throttle({ default: { ttl: ONE_MINUTE_MS, limit: 20 } });

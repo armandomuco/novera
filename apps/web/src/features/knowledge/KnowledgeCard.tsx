@@ -1,6 +1,6 @@
 import { Archive, Pencil, Save, X } from 'lucide-react';
 import { useState } from 'react';
-import { knowledgeItems } from '../../data/demoWorkspace';
+import type { WorkspaceKnowledgeItem } from '../../api/workspaceTypes';
 import type { Translate } from '../../i18n';
 import { knowledgeTypeOptions } from './knowledgeTypeOptions';
 
@@ -12,7 +12,7 @@ export function KnowledgeCard({
   t,
 }: {
   canEdit: boolean;
-  item: (typeof knowledgeItems)[number];
+  item: WorkspaceKnowledgeItem;
   onArchive: (itemId: string) => Promise<void>;
   onUpdate: (input: {
     id: string;

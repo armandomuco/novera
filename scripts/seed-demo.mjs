@@ -4,6 +4,12 @@ import mongoose from 'mongoose';
 const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/novera';
 const DEMO_PASSWORD = 'DemoPass123!';
 
+/** Midnight UTC, `days` from today, so due dates stay relative to when the seed runs. */
+function daysFromToday(days) {
+  const today = new Date();
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days));
+}
+
 const auditFields = {
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -67,6 +73,7 @@ const schemas = {
       ownerName: String,
       riskLevel: String,
       dueDate: Date,
+      progress: { type: Number, default: 0 },
       createdBy: mongoose.Schema.Types.ObjectId,
       updatedBy: mongoose.Schema.Types.ObjectId,
       createdAt: Date,
@@ -112,22 +119,6 @@ const schemas = {
     },
     { collection: 'documents' },
   ),
-  Risk: new mongoose.Schema(
-    {
-      organizationId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
-      projectId: { type: mongoose.Schema.Types.ObjectId, index: true },
-      title: { type: String, required: true },
-      severity: String,
-      likelihood: String,
-      status: String,
-      mitigation: String,
-      ownerName: String,
-      createdAt: Date,
-      updatedAt: Date,
-      deletedAt: Date,
-    },
-    { collection: 'risks' },
-  ),
   ActivityEvent: new mongoose.Schema(
     {
       organizationId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
@@ -148,7 +139,6 @@ const OrganizationMember = mongoose.model('SeedOrganizationMember', schemas.Orga
 const Project = mongoose.model('SeedProject', schemas.Project);
 const KnowledgeItem = mongoose.model('SeedKnowledgeItem', schemas.KnowledgeItem);
 const Document = mongoose.model('SeedDocument', schemas.Document);
-const Risk = mongoose.model('SeedRisk', schemas.Risk);
 const ActivityEvent = mongoose.model('SeedActivityEvent', schemas.ActivityEvent);
 
 const demoUsers = [
@@ -251,7 +241,8 @@ async function upsertDemoData() {
       ],
       ownerName: 'Mira Chen',
       riskLevel: 'High',
-      dueDate: new Date('2026-08-05'),
+      dueDate: daysFromToday(-2),
+      progress: 62,
     },
     {
       name: 'Q3 retainer',
@@ -260,7 +251,8 @@ async function upsertDemoData() {
       objectives: ['Confirm priorities', 'Approve budget', 'Schedule delivery cadence'],
       ownerName: 'Adrian Vale',
       riskLevel: 'Medium',
-      dueDate: new Date('2026-08-15'),
+      dueDate: daysFromToday(5),
+      progress: 78,
     },
     {
       name: 'Finance portal',
@@ -269,7 +261,8 @@ async function upsertDemoData() {
       objectives: ['Review requirements', 'Finalize permissions', 'Prepare first demo'],
       ownerName: 'Leo Marin',
       riskLevel: 'Low',
-      dueDate: new Date('2026-09-01'),
+      dueDate: daysFromToday(30),
+      progress: 44,
     },
   ];
 
@@ -402,34 +395,40 @@ async function upsertDemoData() {
     );
   }
 
-  const risks = [
+  // Risks are knowledge items of type "risk"; the dashboard also derives risks from
+  // overdue, delayed and high-risk projects. The old separate risks collection is unused.
+  await mongoose.connection.collection('risks').deleteMany({ organizationId: organization._id });
+  const riskSeeds = [
     {
       projectId: atlas._id,
-      title: 'CRM export credentials still missing',
-      severity: 'High',
-      likelihood: 'Medium',
-      status: 'Open',
-      mitigation: 'Escalate to customer sponsor and prepare fallback CSV import path.',
-      ownerName: 'Mira Chen',
+      title: 'Risk: CRM export credentials still missing',
+      content:
+        'Data import cannot start without the customer CRM export credentials. Mitigation: escalate to the customer sponsor and prepare a fallback CSV import path. Owner: Mira Chen.',
+      aiSummary: 'Escalate to the customer sponsor and prepare a fallback CSV import path.',
+      tags: ['atlas', 'risk', 'credentials'],
     },
     {
       projectId: q3._id,
-      title: 'Staffing overlap during Q3 delivery',
-      severity: 'Medium',
-      likelihood: 'Medium',
-      status: 'Monitoring',
-      mitigation: 'Confirm allocation before final scope approval.',
-      ownerName: 'Adrian Vale',
+      title: 'Risk: staffing overlap during Q3 delivery',
+      content:
+        'Two consultants are allocated to overlapping Q3 work. Mitigation: confirm allocation before final scope approval. Owner: Adrian Vale.',
+      aiSummary: 'Confirm staffing allocation before final scope approval.',
+      tags: ['retainer', 'risk', 'staffing'],
     },
   ];
 
-  for (const seed of risks) {
-    await Risk.findOneAndUpdate(
+  for (const seed of riskSeeds) {
+    await KnowledgeItem.findOneAndUpdate(
       { organizationId: organization._id, title: seed.title },
       {
         $set: {
           ...seed,
+          type: 'risk',
+          source: 'Risk review',
           organizationId: organization._id,
+          embeddingStatus: 'pending',
+          createdBy: owner._id,
+          updatedBy: owner._id,
           ...auditFields,
         },
       },
@@ -466,7 +465,11 @@ async function upsertDemoData() {
     projects: await Project.countDocuments({ organizationId: organization._id }),
     knowledgeItems: await KnowledgeItem.countDocuments({ organizationId: organization._id }),
     documents: await Document.countDocuments({ organizationId: organization._id }),
-    risks: await Risk.countDocuments({ organizationId: organization._id }),
+    risks: await KnowledgeItem.countDocuments({
+      organizationId: organization._id,
+      type: 'risk',
+      deletedAt: null,
+    }),
     activityEvents: await ActivityEvent.countDocuments({ organizationId: organization._id }),
   };
 

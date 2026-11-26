@@ -1,8 +1,10 @@
 import { AlertTriangle, CheckCircle2, FileText, FolderKanban, Sparkles } from 'lucide-react';
-import type { WorkspaceData } from '../../api/workspaceTypes';
+import type { DashboardPriority, WorkspaceData } from '../../api/workspaceTypes';
+import { EmptyState } from '../../components/EmptyState';
 import { KnowledgeTwinCanvas } from '../../components/KnowledgeTwinCanvas';
-import type { Translate } from '../../i18n';
+import type { Translate, TranslationKey } from '../../i18n';
 import { ProjectTable } from '../projects/ProjectTable';
+import { reasonLabel, withDays } from '../projects/projectLabels';
 import { RiskPanel } from './RiskPanel';
 
 export function DashboardView({
@@ -16,19 +18,17 @@ export function DashboardView({
 }) {
   const hasWorkspaceSignal =
     data.projects.length + data.knowledgeItems.length + data.documents.length > 0;
+  const insights = data.dashboard;
+  const activeProjects = data.projects.filter((project) => project.status !== 'Archived');
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <div className="grid gap-4 md:grid-cols-4">
           {[
-            [t('activeProjects'), String(data.projects.length), FolderKanban],
-            [t('openRisks'), String(data.risks.length), AlertTriangle],
-            [
-              t('recentDecisions'),
-              String(data.knowledgeItems.filter((item) => item.type === 'Decision').length),
-              CheckCircle2,
-            ],
+            [t('activeProjects'), String(activeProjects.length), FolderKanban],
+            [t('openRisks'), String(insights?.summary.openRisks ?? 0), AlertTriangle],
+            [t('recentDecisions'), String(insights?.summary.recentDecisions ?? 0), CheckCircle2],
             [t('documents'), String(data.documents.length), FileText],
           ].map(([label, value, Icon]) => (
             <div
@@ -109,27 +109,28 @@ export function DashboardView({
                 {t('explainPriorities')}
               </button>
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {(
-                [
-                  'priorityAtlasCredentials',
-                  'priorityRetainerScope',
-                  'priorityFinancePermissions',
-                ] as const
-              ).map((priority) => (
-                <div key={priority} className="quiet-panel rounded-ui p-4">
-                  <p className="text-sm font-semibold text-slate-800">{t(priority)}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{t('linkedToActivity')}</p>
-                </div>
-              ))}
-            </div>
+            {insights?.priorities.length ? (
+              <ol className="mt-5 grid gap-3 md:grid-cols-3">
+                {insights.priorities.map((priority) => (
+                  <PriorityCard
+                    key={`${priority.kind}:${priority.entityId}`}
+                    priority={priority}
+                    t={t}
+                  />
+                ))}
+              </ol>
+            ) : (
+              <div className="mt-5">
+                <EmptyState title={t('noPrioritiesTitle')} body={t('noPrioritiesBody')} />
+              </div>
+            )}
           </div>
         ) : null}
 
-        <ProjectTable onAsk={onAsk} projects={data.projects} t={t} />
+        <ProjectTable onAsk={onAsk} projects={activeProjects} t={t} />
       </div>
 
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
         <KnowledgeTwinCanvas
           domainLabels={[
             t('projects'),
@@ -144,8 +145,54 @@ export function DashboardView({
           title={t('businessTwin')}
           subtitle={t('liveKnowledgeMap')}
         />
-        <RiskPanel risks={data.risks} t={t} />
+        <RiskPanel
+          risks={insights?.risks ?? []}
+          totalRisks={insights?.summary.openRisks ?? 0}
+          t={t}
+        />
       </div>
     </div>
   );
+}
+
+const priorityStyle: Record<DashboardPriority['kind'], string> = {
+  overdue_project: 'text-red-700',
+  at_risk_project: 'text-amber-800',
+  due_soon_project: 'text-teal',
+  recent_decision: 'text-blue-800',
+};
+
+function PriorityCard({ priority, t }: { priority: DashboardPriority; t: Translate }) {
+  const context =
+    priority.kind === 'recent_decision'
+      ? priority.projectName
+      : priority.ownerName
+        ? `${t('owner')}: ${priority.ownerName}`
+        : null;
+  return (
+    <li className="quiet-panel rounded-ui p-4">
+      <p className={`text-xs font-semibold ${priorityStyle[priority.kind]}`}>
+        {priorityReason(priority, t)}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-slate-800">{priority.title}</p>
+      {context ? <p className="mt-2 text-sm leading-6 text-slate-600">{context}</p> : null}
+    </li>
+  );
+}
+
+function priorityReason(priority: DashboardPriority, t: Translate) {
+  const days = priority.days ?? 0;
+  const phrase = (zero: TranslationKey | null, one: TranslationKey, many: TranslationKey) =>
+    days === 0 && zero ? t(zero) : days === 1 ? t(one) : withDays(t(many), days);
+
+  switch (priority.kind) {
+    case 'overdue_project':
+      return phrase(null, 'priorityOverdueOne', 'priorityOverdueMany');
+    case 'due_soon_project':
+      return phrase('priorityDueToday', 'priorityDueTomorrow', 'priorityDueInMany');
+    case 'recent_decision':
+      return phrase('priorityDecisionToday', 'priorityDecisionYesterday', 'priorityDecisionMany');
+    case 'at_risk_project':
+      return priority.reasons.map((reason) => reasonLabel(reason, t)).join(' · ');
+  }
 }

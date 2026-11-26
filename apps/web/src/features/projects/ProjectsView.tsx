@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import type { WorkspaceData } from '../../api/workspaceTypes';
+import type { ProjectUpdate, WorkspaceData } from '../../api/workspaceTypes';
 import { EmptyState } from '../../components/EmptyState';
 import { ReadOnlyNotice } from '../../components/ReadOnlyNotice';
 import type { Translate } from '../../i18n';
@@ -20,12 +20,7 @@ export function ProjectsView({
   onArchiveProject: (projectId: string) => Promise<void>;
   onAsk: (question: string) => void;
   onCreateProject: (input: { name: string; owner: string; summary: string }) => Promise<boolean>;
-  onUpdateProject: (input: {
-    id: string;
-    name: string;
-    owner: string;
-    summary: string;
-  }) => Promise<boolean>;
+  onUpdateProject: (input: ProjectUpdate) => Promise<boolean>;
   t: Translate;
 }) {
   const [name, setName] = useState('');
@@ -87,7 +82,7 @@ export function ProjectsView({
         {data.projects.length ? (
           data.projects.map((project) => (
             <ProjectCard
-              key={project.id ?? project.name}
+              key={project.id}
               canEdit={canEdit}
               onArchive={onArchiveProject}
               onUpdate={onUpdateProject}

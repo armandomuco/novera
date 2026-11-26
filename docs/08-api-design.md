@@ -63,7 +63,7 @@ Current implementation note: invitation creation, cancellation, inspection, expi
 - `POST /projects`: create project. Owner, Administrator, or Manager. Implemented with tenant validation.
 - `GET /projects`: paginated list. Member with permission. Implemented with active organization default and optional organization filter.
 - `GET /projects/:projectId`: project detail. Implemented with project organization membership validation.
-- `PATCH /projects/:projectId`: update project. Owner, Administrator, or Manager. Implemented.
+- `PATCH /projects/:projectId`: update project. Owner, Administrator, or Manager. Implemented. Accepts `name`, `description`, `status`, `riskLevel`, `ownerName`, `dueDate` (ISO date, or `null` to clear it), `progress` (integer 0-100), and `objectives`.
 - `DELETE /projects/:projectId`: archive. Owner, Administrator, or Manager. Implemented as soft deletion.
 - `POST /organizations/:organizationId/projects/:projectId/members`: assign member. Manager+.
 
@@ -102,6 +102,18 @@ Current implementation note: keyword search over document chunks is available th
 - `GET /activity`: timeline. Member+. Implemented with active organization default and optional organization filter.
 
 Current implementation note: project create/update/archive and knowledge create/update/archive record activity events.
+
+## Assistant
+
+- `POST /assistant/ask`: answers a question from the active organization's documents, knowledge items, and projects. Any active member. Body: `question` (2-1000 characters), optional `projectId` (must belong to the active organization), optional `language` (`en`, `sq`, `it`, `de`, `fr`). Returns `answer` (null when no record matches), `confidence` (`high`, `medium`, `low`, `none`), cited `sources` with ids matching the `[S1]` markers in the answer, `missingTerms`, `provider`, `model`, `promptVersion`, and `interactionId`. Limited to 20 requests per minute.
+
+## Dashboard
+
+- `GET /dashboard`: risks, priorities, and counts for the active organization. Any active member. Nothing is stored; the response is derived on each request from projects and knowledge items:
+  - `risks`: open projects (not archived, progress below 100) that are overdue, `Delayed`, or `High` risk, plus knowledge items of type `risk`. Overdue or high-risk projects are `High` severity, delayed ones `Medium`; knowledge-item risks have no severity. A risk is closed by changing the project or archiving the knowledge item. At most 10 are returned; `summary.openRisks` has the full count.
+  - `priorities` (at most 6, in this order): overdue projects (most overdue first), delayed or high-risk projects, projects due within 7 days, and decisions recorded in the last 14 days.
+  - `summary`: `openRisks`, `overdueProjects`, `dueSoonProjects`, `recentDecisions`.
+  - Dates are compared by UTC calendar day; a project due today is not overdue.
 
 ## Demo Workspace
 

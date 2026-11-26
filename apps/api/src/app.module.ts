@@ -5,7 +5,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ActivityModule } from './activity/activity.module';
+import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { validateEnvironment } from './common/config/env.validation';
 import { DEFAULT_RATE_LIMIT } from './common/rate-limit';
 import { DemoRequestsModule } from './demo-requests/demo-requests.module';
@@ -36,6 +38,8 @@ import { ProjectsModule } from './projects/projects.module';
     ProjectsModule,
     KnowledgeModule,
     DocumentsModule,
+    AssistantModule,
+    DashboardModule,
     DemoRequestsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

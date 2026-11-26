@@ -1,20 +1,11 @@
+import type { WorkspaceKnowledgeItem, WorkspaceProject } from '../api/workspaceTypes';
+
 export type DemoUser = {
   role: string;
   name: string;
   email: string;
   password: string;
   focus: string;
-};
-
-export type Project = {
-  id: string;
-  name: string;
-  status: string;
-  risk: string;
-  owner: string;
-  due: string;
-  progress: number;
-  summary: string;
 };
 
 export type ActivityItem = {
@@ -62,14 +53,14 @@ export const demoUsers: DemoUser[] = [
   },
 ];
 
-export const projects: Project[] = [
+export const projects: WorkspaceProject[] = [
   {
     id: 'demo-atlas-onboarding',
     name: 'Atlas onboarding',
     status: 'Delayed',
     risk: 'High',
     owner: 'Mira Chen',
-    due: 'Aug 5',
+    dueDate: '2026-08-05T00:00:00.000Z',
     progress: 62,
     summary: 'Blocked by missing CRM export credentials. Customer escalation is open.',
   },
@@ -79,7 +70,7 @@ export const projects: Project[] = [
     status: 'On track',
     risk: 'Medium',
     owner: 'Adrian Vale',
-    due: 'Aug 15',
+    dueDate: '2026-08-15T00:00:00.000Z',
     progress: 78,
     summary: 'Scope is nearly approved. Staffing allocation still needs confirmation.',
   },
@@ -89,13 +80,13 @@ export const projects: Project[] = [
     status: 'Review',
     risk: 'Low',
     owner: 'Leo Marin',
-    due: 'Sep 1',
+    dueDate: '2026-09-01T00:00:00.000Z',
     progress: 44,
     summary: 'Requirements review is active. Permissions model is the next decision.',
   },
 ];
 
-export const knowledgeItems = [
+export const knowledgeItems: WorkspaceKnowledgeItem[] = [
   {
     id: 'demo-atlas-decision',
     type: 'Decision',
@@ -154,21 +145,6 @@ export const documents = [
     status: 'Needs review',
     project: 'Finance portal',
     updated: '2 days ago',
-  },
-];
-
-export const risks = [
-  {
-    title: 'CRM export credentials still missing',
-    severity: 'High',
-    owner: 'Mira Chen',
-    mitigation: 'Escalate to customer sponsor and prepare fallback CSV import path.',
-  },
-  {
-    title: 'Staffing overlap during Q3 delivery',
-    severity: 'Medium',
-    owner: 'Adrian Vale',
-    mitigation: 'Confirm allocation before final retainer approval.',
   },
 ];
 

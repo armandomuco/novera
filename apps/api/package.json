@@ -17,7 +17,7 @@
     "@nestjs/core": "^11.2.6",
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.2.6",
-    "@nestjs/swagger": "^11.4.6",
+    "@nestjs/swagger": "^11.4.8",
     "@nestjs/throttler": "^6.8.0",
     "bullmq": "^6.3.9",
     "class-transformer": "^0.5.1",
@@ -26,11 +26,11 @@
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.13.0",
-    "mongoose": "^8.5.3",
+    "mongoose": "^8.24.11",
     "pdf-parse": "^2.4.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",

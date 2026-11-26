@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import { ReadOnlyNotice } from '../../components/ReadOnlyNotice';
-import { knowledgeItems } from '../../data/demoWorkspace';
+import type { WorkspaceKnowledgeItem } from '../../api/workspaceTypes';
 import type { Translate } from '../../i18n';
 import { KnowledgeCard } from './KnowledgeCard';
 import { knowledgeTypeOptions } from './knowledgeTypeOptions';
@@ -18,7 +18,7 @@ export function KnowledgeView({
   t,
 }: {
   canEdit: boolean;
-  items: typeof knowledgeItems;
+  items: WorkspaceKnowledgeItem[];
   onArchiveKnowledge: (itemId: string) => Promise<void>;
   onCreateKnowledge: (input: { title: string; type: string; summary: string }) => Promise<boolean>;
   onUpdateKnowledge: (input: {

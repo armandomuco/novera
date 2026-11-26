@@ -30,7 +30,8 @@
   },
   "overrides": {
     "@nestjs/platform-express": {
-      "multer": "2.4.0"
-    }
+      "multer": "2.5.0"
+    },
+    "mongoose": "^8.24.11"
   }
 }
